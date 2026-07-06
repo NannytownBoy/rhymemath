@@ -1,0 +1,310 @@
+/**
+ * mockData.ts
+ * Seed data for the RhymeMath rapper database.
+ * Structured so Supabase can replace this later.
+ */
+
+export interface MockArtist {
+  id: number;
+  slug: string;
+  name: string;
+  realName: string;
+  hometown: string;
+  era: string;
+  bio: string;
+  imageUrl: string;
+  overallAverage: number;
+  totalComparisons: number;
+  wins: number;
+  losses: number;
+  bestVerseTitle: string;
+  bestVerseScore: number;
+  categoryAverages: {
+    flow: number;
+    wordplay: number;
+    storytelling: number;
+    rhyming: number;
+    punchlines: number;
+  };
+  bestVerse?: string;
+  recentComparisons: { opponent: string; result: "W" | "L" | "T"; score: string }[];
+}
+
+export const MOCK_ARTISTS: MockArtist[] = [
+  {
+    id: 1,
+    slug: "kendrick-lamar",
+    name: "Kendrick Lamar",
+    realName: "Kendrick Lamar Duckworth",
+    hometown: "Compton, CA",
+    era: "2010s–Present",
+    bio: "Pulitzer Prize-winning rapper from Compton. Known for dense narrative structures, complex rhyme patterns, and socially charged lyricism. His storytelling is considered among the most technically advanced in rap history.",
+    imageUrl: "",
+    overallAverage: 91.2,
+    totalComparisons: 847,
+    wins: 689,
+    losses: 121,
+    bestVerseTitle: "Backseat Freestyle",
+    bestVerseScore: 97.4,
+    categoryAverages: { flow: 93, wordplay: 90, storytelling: 95, rhyming: 89, punchlines: 88 },
+    recentComparisons: [
+      { opponent: "Drake", result: "W", score: "91–76" },
+      { opponent: "J. Cole", result: "W", score: "88–85" },
+      { opponent: "Lil Wayne", result: "W", score: "90–84" },
+    ],
+  },
+  {
+    id: 2,
+    slug: "jay-z",
+    name: "Jay-Z",
+    realName: "Shawn Corey Carter",
+    hometown: "Brooklyn, NY",
+    era: "1990s–Present",
+    bio: "Brooklyn's finest. Known for effortless delivery, business-minded lyricism, and an unmatched catalog spanning three decades. Jay-Z's internal rhyme schemes and double entendres set a standard for rap wordplay.",
+    imageUrl: "",
+    overallAverage: 89.7,
+    totalComparisons: 712,
+    wins: 561,
+    losses: 134,
+    bestVerseTitle: "Takeover",
+    bestVerseScore: 95.8,
+    categoryAverages: { flow: 88, wordplay: 92, storytelling: 88, rhyming: 87, punchlines: 93 },
+    recentComparisons: [
+      { opponent: "Nas", result: "W", score: "87–84" },
+      { opponent: "Eminem", result: "L", score: "84–91" },
+      { opponent: "Biggie", result: "T", score: "88–88" },
+    ],
+  },
+  {
+    id: 3,
+    slug: "eminem",
+    name: "Eminem",
+    realName: "Marshall Bruce Mathers III",
+    hometown: "Detroit, MI",
+    era: "1990s–Present",
+    bio: "Detroit's technical marvel. Eminem's multisyllabic rhyme chains, rapid-fire cadence, and internal rhyme density remain benchmarks for technical rap. His flow variety and syllable-per-bar counts are statistically among the highest in the genre.",
+    imageUrl: "",
+    overallAverage: 92.1,
+    totalComparisons: 934,
+    wins: 753,
+    losses: 148,
+    bestVerseTitle: "Rap God",
+    bestVerseScore: 98.1,
+    categoryAverages: { flow: 96, wordplay: 91, storytelling: 85, rhyming: 98, punchlines: 90 },
+    recentComparisons: [
+      { opponent: "Jay-Z", result: "W", score: "91–84" },
+      { opponent: "Kendrick Lamar", result: "L", score: "88–91" },
+      { opponent: "Biggie", result: "W", score: "87–82" },
+    ],
+  },
+  {
+    id: 4,
+    slug: "nas",
+    name: "Nas",
+    realName: "Nasir Bin Olu Dara Jones",
+    hometown: "Queensbridge, NY",
+    era: "1990s–Present",
+    bio: "Queensbridge's poet laureate. Nas defined East Coast storytelling with cinematic narratives, vivid imagery, and authoritative delivery. His debut album is widely considered the greatest rap album ever made.",
+    imageUrl: "",
+    overallAverage: 90.3,
+    totalComparisons: 698,
+    wins: 549,
+    losses: 131,
+    bestVerseTitle: "NY State of Mind",
+    bestVerseScore: 96.7,
+    categoryAverages: { flow: 87, wordplay: 88, storytelling: 97, rhyming: 86, punchlines: 84 },
+    recentComparisons: [
+      { opponent: "Jay-Z", result: "L", score: "84–87" },
+      { opponent: "Biggie", result: "W", score: "88–85" },
+      { opponent: "Rakim", result: "W", score: "86–81" },
+    ],
+  },
+  {
+    id: 5,
+    slug: "lil-wayne",
+    name: "Lil Wayne",
+    realName: "Dwayne Michael Carter Jr.",
+    hometown: "New Orleans, LA",
+    era: "2000s–Present",
+    bio: "The greatest rapper alive in his prime (2006–2010). Known for stream-of-consciousness punchline density, unconventional metaphors, and an unmatched mixtape work ethic. Wayne's double entendres and random genius have been endlessly studied.",
+    imageUrl: "",
+    overallAverage: 87.4,
+    totalComparisons: 621,
+    wins: 456,
+    losses: 148,
+    bestVerseTitle: "A Milli",
+    bestVerseScore: 93.2,
+    categoryAverages: { flow: 85, wordplay: 93, storytelling: 75, rhyming: 84, punchlines: 97 },
+    recentComparisons: [
+      { opponent: "Kendrick Lamar", result: "L", score: "84–90" },
+      { opponent: "Drake", result: "W", score: "86–79" },
+      { opponent: "Nicki Minaj", result: "W", score: "88–82" },
+    ],
+  },
+  {
+    id: 6,
+    slug: "biggie",
+    name: "The Notorious B.I.G.",
+    realName: "Christopher George Latore Wallace",
+    hometown: "Brooklyn, NY",
+    era: "1990s",
+    bio: "The greatest of all time by many accounts. Biggie's natural rhythmic pocket, conversational delivery, and effortless punchline construction remain the gold standard. His ability to make complex rhymes sound easy is unparalleled.",
+    imageUrl: "",
+    overallAverage: 93.4,
+    totalComparisons: 789,
+    wins: 634,
+    losses: 112,
+    bestVerseTitle: "Juicy",
+    bestVerseScore: 97.8,
+    categoryAverages: { flow: 97, wordplay: 91, storytelling: 94, rhyming: 90, punchlines: 95 },
+    recentComparisons: [
+      { opponent: "Tupac", result: "T", score: "92–91" },
+      { opponent: "Jay-Z", result: "T", score: "88–88" },
+      { opponent: "Nas", result: "L", score: "85–88" },
+    ],
+  },
+  {
+    id: 7,
+    slug: "j-cole",
+    name: "J. Cole",
+    realName: "Jermaine Lamarr Cole",
+    hometown: "Fayetteville, NC",
+    era: "2010s–Present",
+    bio: "Fayetteville's introspective voice. J. Cole's storytelling structures, autobiographical lyricism, and consistent rhyme schemes make him one of the most technically reliable rappers working today. Known for precise cadence control.",
+    imageUrl: "",
+    overallAverage: 86.8,
+    totalComparisons: 534,
+    wins: 389,
+    losses: 127,
+    bestVerseTitle: "No Role Modelz",
+    bestVerseScore: 91.3,
+    categoryAverages: { flow: 88, wordplay: 82, storytelling: 92, rhyming: 83, punchlines: 85 },
+    recentComparisons: [
+      { opponent: "Kendrick Lamar", result: "L", score: "85–88" },
+      { opponent: "Drake", result: "W", score: "83–77" },
+      { opponent: "Meek Mill", result: "W", score: "86–71" },
+    ],
+  },
+  {
+    id: 8,
+    slug: "drake",
+    name: "Drake",
+    realName: "Aubrey Drake Graham",
+    hometown: "Toronto, ON",
+    era: "2010s–Present",
+    bio: "The most commercially successful rapper of his generation. Drake's melodic delivery, relatable storytelling, and consistent hitmaking have defined a decade of hip-hop. His emotional range and hook craft are unmatched commercially.",
+    imageUrl: "",
+    overallAverage: 79.2,
+    totalComparisons: 743,
+    wins: 477,
+    losses: 247,
+    bestVerseTitle: "Forever",
+    bestVerseScore: 85.4,
+    categoryAverages: { flow: 82, wordplay: 74, storytelling: 83, rhyming: 76, punchlines: 80 },
+    recentComparisons: [
+      { opponent: "Kendrick Lamar", result: "L", score: "76–91" },
+      { opponent: "Lil Wayne", result: "L", score: "79–86" },
+      { opponent: "J. Cole", result: "L", score: "77–83" },
+    ],
+  },
+  {
+    id: 9,
+    slug: "rakim",
+    name: "Rakim",
+    realName: "William Michael Griffin Jr.",
+    hometown: "Wyandanch, NY",
+    era: "1980s–1990s",
+    bio: "The God MC. Rakim revolutionized rap with internal rhyme schemes, complex vocabulary, and a metered flow that predated modern lyricism by decades. Without Rakim, none of what followed would exist.",
+    imageUrl: "",
+    overallAverage: 91.8,
+    totalComparisons: 423,
+    wins: 342,
+    losses: 67,
+    bestVerseTitle: "Paid in Full",
+    bestVerseScore: 95.2,
+    categoryAverages: { flow: 94, wordplay: 89, storytelling: 87, rhyming: 96, punchlines: 83 },
+    recentComparisons: [
+      { opponent: "Nas", result: "L", score: "81–86" },
+      { opponent: "Jay-Z", result: "L", score: "84–89" },
+      { opponent: "Big Daddy Kane", result: "W", score: "90–81" },
+    ],
+  },
+  {
+    id: 10,
+    slug: "andre-3000",
+    name: "André 3000",
+    realName: "André Lauren Benjamin",
+    hometown: "Atlanta, GA",
+    era: "1990s–2000s",
+    bio: "Outkast's eclectic genius. André 3000 combined genre-defying creativity, unexpected rhyme structures, and an almost alien originality that has made his verses some of the most analyzed in rap history.",
+    imageUrl: "",
+    overallAverage: 90.9,
+    totalComparisons: 467,
+    wins: 371,
+    losses: 78,
+    bestVerseTitle: "Aquemini",
+    bestVerseScore: 96.1,
+    categoryAverages: { flow: 89, wordplay: 96, storytelling: 91, rhyming: 87, punchlines: 90 },
+    recentComparisons: [
+      { opponent: "Lil Wayne", result: "W", score: "89–84" },
+      { opponent: "Kendrick Lamar", result: "L", score: "87–90" },
+      { opponent: "Jay-Z", result: "W", score: "88–85" },
+    ],
+  },
+  {
+    id: 11,
+    slug: "nicki-minaj",
+    name: "Nicki Minaj",
+    realName: "Onika Tanya Maraj",
+    hometown: "Trinidad / Queens, NY",
+    era: "2010s–Present",
+    bio: "The Queen of Rap. Nicki's character switching, multisyllabic flow, and punchline delivery are technically elite. Her verse on Monster remains one of the most celebrated guest features in hip-hop history.",
+    imageUrl: "",
+    overallAverage: 84.7,
+    totalComparisons: 389,
+    wins: 267,
+    losses: 108,
+    bestVerseTitle: "Monster",
+    bestVerseScore: 94.3,
+    categoryAverages: { flow: 87, wordplay: 85, storytelling: 78, rhyming: 84, punchlines: 90 },
+    recentComparisons: [
+      { opponent: "Lil Wayne", result: "L", score: "82–88" },
+      { opponent: "Cardi B", result: "W", score: "84–73" },
+      { opponent: "Drake", result: "W", score: "83–79" },
+    ],
+  },
+  {
+    id: 12,
+    slug: "tupac",
+    name: "Tupac Shakur",
+    realName: "Lesane Parish Crooks",
+    hometown: "East Harlem, NY / Oakland, CA",
+    era: "1990s",
+    bio: "2Pac's emotional authenticity, activist voice, and raw narrative power made him a cultural icon. His delivery carried conviction that transcended technical metrics — his storytelling and emotional arc are unmatched in the genre.",
+    imageUrl: "",
+    overallAverage: 88.1,
+    totalComparisons: 678,
+    wins: 521,
+    losses: 134,
+    bestVerseTitle: "Dear Mama",
+    bestVerseScore: 94.9,
+    categoryAverages: { flow: 86, wordplay: 82, storytelling: 96, rhyming: 83, punchlines: 85 },
+    recentComparisons: [
+      { opponent: "Biggie", result: "T", score: "91–92" },
+      { opponent: "Jay-Z", result: "L", score: "84–87" },
+      { opponent: "Nas", result: "W", score: "88–85" },
+    ],
+  },
+];
+
+export const MOCK_LEADERBOARD = {
+  overall: [...MOCK_ARTISTS].sort((a, b) => b.overallAverage - a.overallAverage),
+  flow: [...MOCK_ARTISTS].sort((a, b) => b.categoryAverages.flow - a.categoryAverages.flow),
+  wordplay: [...MOCK_ARTISTS].sort((a, b) => b.categoryAverages.wordplay - a.categoryAverages.wordplay),
+  storytelling: [...MOCK_ARTISTS].sort((a, b) => b.categoryAverages.storytelling - a.categoryAverages.storytelling),
+  rhyming: [...MOCK_ARTISTS].sort((a, b) => b.categoryAverages.rhyming - a.categoryAverages.rhyming),
+  punchlines: [...MOCK_ARTISTS].sort((a, b) => b.categoryAverages.punchlines - a.categoryAverages.punchlines),
+  bestVerse: [...MOCK_ARTISTS].sort((a, b) => b.bestVerseScore - a.bestVerseScore),
+  mostCompared: [...MOCK_ARTISTS].sort((a, b) => b.totalComparisons - a.totalComparisons),
+  trending: [...MOCK_ARTISTS].sort(() => Math.random() - 0.5).slice(0, 8),
+};

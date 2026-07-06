@@ -1,0 +1,336 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 97%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 220 80% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 15%;
+
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 220 80% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 78%;
+    --input: 0 0% 100%;
+    --ring: 220 80% 38%;
+
+    --radius: 0.15rem;
+  }
+
+  .dark {
+    --background: 0 0% 97%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 220 80% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 220 80% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 78%;
+    --input: 0 0% 100%;
+    --ring: 220 80% 38%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Force light mode — old internet is always light */
+    color-scheme: light;
+  }
+
+  body {
+    background-color: #f7f5f0;
+    color: #111111;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 14px;
+    line-height: 1.55;
+    min-height: 100dvh;
+    -webkit-font-smoothing: auto;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  a {
+    color: #0000cc;
+    text-decoration: underline;
+  }
+  a:visited { color: #551a8b; }
+  a:hover { color: #cc0000; }
+
+  /* Thin scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #e8e6e0; }
+  ::-webkit-scrollbar-thumb { background: #999; border-radius: 0; }
+
+  ::selection { background: #c8d8f8; color: #000; }
+
+  input, textarea, select {
+    font-family: 'Courier New', 'Courier', monospace;
+    font-size: 12px;
+  }
+}
+
+/* ── Old Internet Utilities ── */
+@layer utilities {
+
+  /* The classic "box" — white bg, gray border */
+  .rm-card {
+    background: #ffffff;
+    border: 1px solid #bbbbbb;
+    border-radius: 0;
+  }
+
+  .rm-card-hover {
+    transition: border-color 0.1s;
+  }
+  .rm-card-hover:hover {
+    border-color: #0000cc;
+  }
+
+  /* Inset box for forum post style */
+  .rm-inset {
+    background: #f0eeea;
+    border: 1px inset #cccccc;
+    padding: 8px;
+  }
+
+  /* Section header bar — like early ESPN */
+  .rm-section-header {
+    background: #222222;
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 8px;
+    border: 1px solid #000000;
+  }
+
+  /* Blue link style header */
+  .rm-section-header-blue {
+    background: #1a3a7a;
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 8px;
+    border: 1px solid #0d2655;
+  }
+
+  /* Stat label — monospace, gray */
+  .rm-label {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555555;
+  }
+
+  /* Score bar track */
+  .rm-score-bar-track {
+    background: #e0ddd8;
+    border: 1px solid #cccccc;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  /* Old-school input */
+  .rm-input {
+    background: #ffffff !important;
+    border: 1px solid #888888 !important;
+    border-radius: 0 !important;
+    color: #111111 !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 12px !important;
+    padding: 4px 6px !important;
+    box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1) !important;
+    transition: border-color 0.1s !important;
+  }
+  .rm-input:focus, .rm-input:focus-visible {
+    border-color: #0000cc !important;
+    outline: none !important;
+    box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1), 0 0 0 1px #0000cc44 !important;
+  }
+  .rm-input::placeholder {
+    color: #999999;
+    font-style: italic;
+  }
+
+  /* Winner badge — green like old stats sites */
+  .rm-winner-badge {
+    background: #006600;
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border: 1px solid #004400;
+    border-radius: 0;
+  }
+
+  /* Horizontal rule old style */
+  .rm-divider {
+    border-color: #cccccc;
+  }
+
+  /* Table zebra stripe */
+  .rm-zebra-odd { background: #ffffff; }
+  .rm-zebra-even { background: #f5f3ef; }
+
+  /* Blue hyperlink button */
+  .rm-btn-link {
+    background: none;
+    border: none;
+    color: #0000cc;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: 'Arial', sans-serif;
+    font-size: 12px;
+    padding: 0;
+  }
+  .rm-btn-link:hover { color: #cc0000; }
+
+  /* Primary action button — old submit button style */
+  .rm-btn-primary {
+    background: #1a3a7a;
+    color: #ffffff;
+    border: 2px outset #3355aa;
+    font-family: 'Arial', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 20px;
+    cursor: pointer;
+    border-radius: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: background 0.1s;
+  }
+  .rm-btn-primary:hover {
+    background: #0d2655;
+    border-style: inset;
+  }
+  .rm-btn-primary:active {
+    border-style: inset;
+    background: #0a1e40;
+  }
+  .rm-btn-primary:disabled {
+    background: #888888;
+    border-color: #aaaaaa;
+    cursor: not-allowed;
+  }
+
+  /* Score bars — blue for A, red/orange for B */
+  .rm-bar-a { background: #1a4fa8; }
+  .rm-bar-b { background: #c0392b; }
+
+  /* Announcement / callout box */
+  .rm-callout {
+    background: #fffbe6;
+    border: 1px solid #ccaa00;
+    border-left: 4px solid #ccaa00;
+    padding: 8px 12px;
+    font-family: 'Arial', sans-serif;
+    font-size: 12px;
+  }
+
+  /* Winner callout */
+  .rm-winner-box {
+    background: #e8f5e8;
+    border: 2px solid #006600;
+    padding: 12px 16px;
+  }
+
+  /* Tie callout */
+  .rm-tie-box {
+    background: #f5f5e8;
+    border: 2px solid #888800;
+    padding: 12px 16px;
+  }
+
+  /* Monospace data display */
+  .rm-mono {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+  }
+
+  /* Nav tab style */
+  .rm-nav-tab {
+    font-family: 'Arial', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border: 1px solid #888888;
+    background: #e8e6e0;
+    color: #222222;
+    cursor: pointer;
+    text-decoration: none;
+    border-radius: 0;
+    display: inline-block;
+    transition: background 0.1s;
+  }
+  .rm-nav-tab:hover {
+    background: #d0cec8;
+    color: #000000;
+    text-decoration: none;
+  }
+  .rm-nav-tab.active {
+    background: #1a3a7a;
+    color: #ffffff;
+    border-color: #0d2655;
+  }
+
+  /* Animate score fill */
+  @keyframes scoreFill {
+    from { width: 0%; }
+    to { width: var(--target-width); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+}
