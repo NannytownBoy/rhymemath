@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient.js";
 import type { RhymeMathResult } from "../lib/types.js";
 import ArtistTypeahead, { type VerseSearchResult } from "../components/ArtistTypeahead.js";
+import SongTypeahead from "../components/SongTypeahead.js";
 
 const VERSE_LABEL_OPTIONS = ["Verse 1", "Verse 2", "Verse 3", "Hook", "Bridge", "Outro", "Intro", "Guest Verse"];
 
@@ -361,9 +362,19 @@ export default function Home() {
                   <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
                     Song Title <span style={{ color: "#cc0000" }}>*</span>
                   </label>
-                  <input data-testid="input-song-a" className="rm-input" style={{ width: "100%" }}
+                  <SongTypeahead
+                    value={songA}
+                    onChange={setSongA}
+                    artistName={artistA}
+                    onSelectVerse={(r: VerseSearchResult) => {
+                      setArtistA(r.artistName);
+                      setSongA(r.songName);
+                      setVerseA(r.verse);
+                      setVerseLabelA(r.verseLabel ?? "");
+                    }}
                     placeholder="e.g. HUMBLE."
-                    value={songA} onChange={e => setSongA(e.target.value)} />
+                    testId="input-song-a"
+                  />
                 </div>
               </div>
               <div style={{ marginBottom: "8px" }}>
@@ -423,8 +434,19 @@ export default function Home() {
                     <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
                       Song Title <span style={{ color: "#cc0000" }}>*</span>
                     </label>
-                    <input data-testid="input-song-b" className="rm-input" style={{ width: "100%" }}
-                      placeholder="e.g. Takeover" value={songB} onChange={e => setSongB(e.target.value)} />
+                    <SongTypeahead
+                      value={songB}
+                      onChange={setSongB}
+                      artistName={artistB}
+                      onSelectVerse={(r: VerseSearchResult) => {
+                        setArtistB(r.artistName);
+                        setSongB(r.songName);
+                        setVerseB(r.verse);
+                        setVerseLabelB(r.verseLabel ?? "");
+                      }}
+                      placeholder="e.g. Takeover"
+                      testId="input-song-b"
+                    />
                   </div>
                 </div>
                 <div style={{ marginBottom: "8px" }}>
