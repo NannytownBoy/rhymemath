@@ -8,7 +8,7 @@ import type {
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, ilike, and, or } from "drizzle-orm";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -22,6 +22,8 @@ export interface IStorage {
   saveAnalysis(data: InsertAnalysis): Promise<Analysis>;
   getAnalysis(resultId: string): Promise<Analysis | undefined>;
   getRecentAnalyses(limit: number): Promise<Analysis[]>;
+  searchVerses(q: string, artist: string, limit: number): Promise<Analysis[]>;
+  getDistinctArtists(): Promise<string[]>;
 
   // Comparisons
   saveComparison(data: InsertComparison): Promise<Comparison>;
@@ -58,6 +60,50 @@ export class DatabaseStorage implements IStorage {
   async getRecentAnalyses(limit: number): Promise<Analysis[]> {
     const rows = await db.select().from(analyses).orderBy(desc(analyses.createdAt));
     return rows.slice(0, limit);
+  }
+
+  async searchVerses(q: string, artist: string, limit: number = 10): Promise<Analysis[]> {
+    let rows: Analysis[];
+    const hasQ = q && q.trim().length > 0;
+    const hasArtist = artist && artist.trim().length > 0;
+
+    if (hasArtist && hasQ) {
+      rows = await db.select().from(analyses)
+        .where(and(
+          ilike(analyses.artistName, `%${artist.trim()}%`),
+          or(
+            ilike(analyses.verse, `%${q.trim()}%`),
+            ilike(analyses.songName, `%${q.trim()}%`)
+          )
+        ))
+        .orderBy(desc(analyses.createdAt));
+    } else if (hasArtist) {
+      rows = await db.select().from(analyses)
+        .where(ilike(analyses.artistName, `%${artist.trim()}%`))
+        .orderBy(desc(analyses.createdAt));
+    } else if (hasQ) {
+      rows = await db.select().from(analyses)
+        .where(or(
+          ilike(analyses.artistName, `%${q.trim()}%`),
+          ilike(analyses.verse, `%${q.trim()}%`),
+          ilike(analyses.songName, `%${q.trim()}%`)
+        ))
+        .orderBy(desc(analyses.createdAt));
+    } else {
+      rows = await db.select().from(analyses).orderBy(desc(analyses.createdAt));
+    }
+    return rows.slice(0, limit);
+  }
+
+  async getDistinctArtists(): Promise<string[]> {
+    const rows = await db.select({ artistName: analyses.artistName }).from(analyses).orderBy(analyses.artistName);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const r of rows) {
+      const key = r.artistName.toLowerCase().trim();
+      if (!seen.has(key)) { seen.add(key); result.push(r.artistName); }
+    }
+    return result;
   }
 
   // Comparisons

@@ -163,6 +163,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // -- GET /api/verses/search?q=&artist=&limit= --------------------------------
+  app.get("/api/verses/search", async (req, res) => {
+    try {
+      const q = (req.query.q as string) ?? "";
+      const artist = (req.query.artist as string) ?? "";
+      const limit = Math.min(parseInt((req.query.limit as string) ?? "10", 10), 25);
+      const results = await storage.searchVerses(q, artist, limit);
+      res.json(results.map(a => ({
+        resultId: a.resultId,
+        artistName: a.artistName,
+        songName: a.songName,
+        verseLabel: a.verseLabel,
+        verse: a.verse,
+        scoreOverall: a.scoreOverall,
+        scoreFlow: a.scoreFlow,
+        scoreWordplay: a.scoreWordplay,
+        scoreStorytelling: a.scoreStorytelling,
+        scoreRhyming: a.scoreRhyming,
+        scorePunchlines: a.scorePunchlines,
+        createdAt: a.createdAt,
+      })));
+    } catch (err) {
+      res.status(500).json({ error: "Search failed." });
+    }
+  });
+
+  // -- GET /api/verses/artists ------------------------------------------------
+  app.get("/api/verses/artists", async (_req, res) => {
+    try {
+      const artists = await storage.getDistinctArtists();
+      res.json(artists);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load artists." });
+    }
+  });
+
   // -- GET /api/analysis/:id ------------------------------------------------
   app.get("/api/analysis/:id", async (req, res) => {
     try {
