@@ -130,7 +130,7 @@ export default function SoloResults() {
         </div>
 
         {/* Score Breakdown */}
-        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>&#9658; SCORE BREAKDOWN</div>
+        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ SCORE BREAKDOWN</div>
         <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
           {[
             { label: "Flow (30%)", value: scores.flow },
@@ -150,7 +150,7 @@ export default function SoloResults() {
         </div>
 
         {/* Category Reasoning */}
-        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>&#9658; ANALYSIS</div>
+        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ ANALYSIS</div>
         <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
           <p style={{ fontFamily: "Georgia, serif", fontSize: "13px", color: "#333", margin: "0 0 12px", lineHeight: "1.6" }}>
             {result.explanation}
@@ -170,7 +170,7 @@ export default function SoloResults() {
         {/* Technical Metrics */}
         {measured && (
           <>
-            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>&#9658; TECHNICAL METRICS</div>
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ TECHNICAL METRICS</div>
             <div className="rm-card" style={{ padding: "10px 14px", marginBottom: "12px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Courier New, monospace", fontSize: "11px" }}>
                 <tbody>
@@ -197,7 +197,7 @@ export default function SoloResults() {
         {/* Verse Annotation */}
         {result.annotation && result.verse && !result.verse.startsWith("[No verse") && (
           <>
-            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>&#9658; VERSE ANNOTATION</div>
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ VERSE ANNOTATION</div>
             <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
               <VerseAnnotation lines={result.annotation ?? []} side="A" artistName={result.artistName ?? ""} />
             </div>

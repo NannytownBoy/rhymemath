@@ -335,7 +335,7 @@ export default function Home() {
                 background: appMode === "battle" ? "#1a3a7a" : "#1a3a7a",
               }}
             >
-              {appMode === "solo" ? "&#9658; VERSE" : "&#9658; VERSE A"}
+              {appMode === "solo" ? "▶ VERSE" : "▶ VERSE A"}
             </div>
             <div className="rm-card" style={{ padding: "10px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
@@ -389,7 +389,7 @@ export default function Home() {
           {/* Verse B — only in battle mode */}
           {appMode === "battle" && (
             <div>
-              <div className="rm-section-header" style={{ marginBottom: "0", background: "#8b0000", borderColor: "#660000" }}>&#9658; VERSE B</div>
+              <div className="rm-section-header" style={{ marginBottom: "0", background: "#8b0000", borderColor: "#660000" }}>▶ VERSE B</div>
               <div className="rm-card" style={{ padding: "10px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
                   <div>
