@@ -4,7 +4,7 @@ import { cacheResult } from "../lib/resultCache.js";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient.js";
 import type { RhymeMathResult } from "../lib/types.js";
-import VerseSearch, { type VerseSearchResult } from "../components/VerseSearch.js";
+import ArtistTypeahead, { type VerseSearchResult } from "../components/ArtistTypeahead.js";
 
 const VERSE_LABEL_OPTIONS = ["Verse 1", "Verse 2", "Verse 3", "Hook", "Bridge", "Outro", "Intro", "Guest Verse"];
 
@@ -339,24 +339,23 @@ export default function Home() {
               {appMode === "solo" ? "▶ VERSE" : "▶ VERSE A"}
             </div>
             <div className="rm-card" style={{ padding: "10px" }}>
-              <VerseSearch
-                label="Load a previously analyzed verse"
-                placeholder="Search artist, song, or lyric..."
-                onSelect={(r: VerseSearchResult) => {
-                  setArtistA(r.artistName);
-                  setSongA(r.songName);
-                  setVerseA(r.verse);
-                  setVerseLabelA(r.verseLabel ?? "");
-                }}
-              />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
                 <div>
                   <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
                     Artist Name <span style={{ color: "#cc0000" }}>*</span>
                   </label>
-                  <input data-testid="input-artist-a" className="rm-input" style={{ width: "100%" }}
+                  <ArtistTypeahead
+                    value={artistA}
+                    onChange={setArtistA}
+                    onSelectVerse={(r: VerseSearchResult) => {
+                      setArtistA(r.artistName);
+                      setSongA(r.songName);
+                      setVerseA(r.verse);
+                      setVerseLabelA(r.verseLabel ?? "");
+                    }}
                     placeholder={appMode === "solo" ? "e.g. Kendrick Lamar" : "e.g. Kendrick Lamar"}
-                    value={artistA} onChange={e => setArtistA(e.target.value)} />
+                    testId="input-artist-a"
+                  />
                 </div>
                 <div>
                   <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
@@ -402,23 +401,23 @@ export default function Home() {
             <div>
               <div className="rm-section-header" style={{ marginBottom: "0", background: "#8b0000", borderColor: "#660000" }}>▶ VERSE B</div>
               <div className="rm-card" style={{ padding: "10px" }}>
-                <VerseSearch
-                  label="Load a previously analyzed verse"
-                  placeholder="Search artist, song, or lyric..."
-                  onSelect={(r: VerseSearchResult) => {
-                    setArtistB(r.artistName);
-                    setSongB(r.songName);
-                    setVerseB(r.verse);
-                    setVerseLabelB(r.verseLabel ?? "");
-                  }}
-                />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
                   <div>
                     <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
                       Artist Name <span style={{ color: "#cc0000" }}>*</span>
                     </label>
-                    <input data-testid="input-artist-b" className="rm-input" style={{ width: "100%" }}
-                      placeholder="e.g. Jay-Z" value={artistB} onChange={e => setArtistB(e.target.value)} />
+                    <ArtistTypeahead
+                      value={artistB}
+                      onChange={setArtistB}
+                      onSelectVerse={(r: VerseSearchResult) => {
+                        setArtistB(r.artistName);
+                        setSongB(r.songName);
+                        setVerseB(r.verse);
+                        setVerseLabelB(r.verseLabel ?? "");
+                      }}
+                      placeholder="e.g. Jay-Z"
+                      testId="input-artist-b"
+                    />
                   </div>
                   <div>
                     <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
