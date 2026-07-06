@@ -85,6 +85,28 @@ async function ensureTables() {
       );
     `);
     console.log("[startup] Database tables verified/created.");
+    // One-time cleanup: remove test/dummy entries
+    const cleaned = await pool.query(`
+      WITH del_analyses AS (
+        DELETE FROM analyses
+        WHERE LOWER(TRIM(artist_name)) = 'test'
+           OR LOWER(TRIM(song_name))   = 'test'
+        RETURNING id
+      ),
+      del_comparisons AS (
+        DELETE FROM comparisons
+        WHERE LOWER(TRIM(artist_a)) = 'test'
+           OR LOWER(TRIM(artist_b)) = 'test'
+        RETURNING id
+      )
+      SELECT
+        (SELECT COUNT(*) FROM del_analyses)   AS analyses_removed,
+        (SELECT COUNT(*) FROM del_comparisons) AS comparisons_removed;
+    `);
+    const { analyses_removed, comparisons_removed } = cleaned.rows[0];
+    if (Number(analyses_removed) > 0 || Number(comparisons_removed) > 0) {
+      console.log(`[startup] Cleaned up test rows: ${analyses_removed} analyses, ${comparisons_removed} comparisons removed.`);
+    }
   } catch (err) {
     console.error("[startup] Table creation error:", err);
   } finally {
