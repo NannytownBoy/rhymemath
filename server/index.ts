@@ -85,18 +85,22 @@ async function ensureTables() {
       );
     `);
     console.log("[startup] Database tables verified/created.");
-    // One-time cleanup: remove test/dummy entries
+    // Ongoing cleanup: remove test/dummy/typo entries on every boot
     const cleaned = await pool.query(`
       WITH del_analyses AS (
         DELETE FROM analyses
-        WHERE LOWER(TRIM(artist_name)) = 'test'
-           OR LOWER(TRIM(song_name))   = 'test'
+        WHERE LOWER(TRIM(artist_name)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
+           OR LOWER(TRIM(song_name))   IN ('test', 'asdf', 'aaa', 'xxx', 'zzz')
+           OR TRIM(artist_name) = ''
+           OR TRIM(song_name)   = ''
         RETURNING id
       ),
       del_comparisons AS (
         DELETE FROM comparisons
-        WHERE LOWER(TRIM(artist_a)) = 'test'
-           OR LOWER(TRIM(artist_b)) = 'test'
+        WHERE LOWER(TRIM(artist_a)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
+           OR LOWER(TRIM(artist_b)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
+           OR TRIM(artist_a) = ''
+           OR TRIM(artist_b) = ''
         RETURNING id
       )
       SELECT
@@ -105,7 +109,7 @@ async function ensureTables() {
     `);
     const { analyses_removed, comparisons_removed } = cleaned.rows[0];
     if (Number(analyses_removed) > 0 || Number(comparisons_removed) > 0) {
-      console.log(`[startup] Cleaned up test rows: ${analyses_removed} analyses, ${comparisons_removed} comparisons removed.`);
+      console.log(`[startup] Cleaned up bad rows: ${analyses_removed} analyses, ${comparisons_removed} comparisons removed.`);
     }
   } catch (err) {
     console.error("[startup] Table creation error:", err);
