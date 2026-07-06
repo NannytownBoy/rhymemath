@@ -89,16 +89,46 @@ async function ensureTables() {
     const cleaned = await pool.query(`
       WITH del_analyses AS (
         DELETE FROM analyses
-        WHERE LOWER(TRIM(artist_name)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
-           OR LOWER(TRIM(song_name))   IN ('test', 'asdf', 'aaa', 'xxx', 'zzz')
+        WHERE LOWER(TRIM(artist_name)) IN (
+             'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
+             'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
+             'kendrick lemar lamar', 'kdot', 'k dot',
+             'drake aubrey', 'aubrey drake', 'drak',
+             'jay z', 'jayz', 'jay-z.',
+             'eminem slim', 'slim shady eminem',
+             'biggie smalls notorious', 'notorious big', 'biggy',
+             'lil wayne weezy', 'weezy f baby',
+             'nas nasir', 'nasir jones nas'
+           )
+           OR LOWER(TRIM(song_name))   IN ('test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty', 'untitled', 'unknown')
            OR TRIM(artist_name) = ''
            OR TRIM(song_name)   = ''
         RETURNING id
       ),
       del_comparisons AS (
         DELETE FROM comparisons
-        WHERE LOWER(TRIM(artist_a)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
-           OR LOWER(TRIM(artist_b)) IN ('test', 'kendrick lemar', 'asdf', 'aaa', 'xxx', 'zzz')
+        WHERE LOWER(TRIM(artist_a)) IN (
+             'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
+             'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
+             'kendrick lemar lamar', 'kdot', 'k dot',
+             'drake aubrey', 'aubrey drake', 'drak',
+             'jay z', 'jayz', 'jay-z.',
+             'eminem slim', 'slim shady eminem',
+             'biggie smalls notorious', 'notorious big', 'biggy',
+             'lil wayne weezy', 'weezy f baby',
+             'nas nasir', 'nasir jones nas'
+           )
+           OR LOWER(TRIM(artist_b)) IN (
+             'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
+             'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
+             'kendrick lemar lamar', 'kdot', 'k dot',
+             'drake aubrey', 'aubrey drake', 'drak',
+             'jay z', 'jayz', 'jay-z.',
+             'eminem slim', 'slim shady eminem',
+             'biggie smalls notorious', 'notorious big', 'biggy',
+             'lil wayne weezy', 'weezy f baby',
+             'nas nasir', 'nasir jones nas'
+           )
            OR TRIM(artist_a) = ''
            OR TRIM(artist_b) = ''
         RETURNING id
