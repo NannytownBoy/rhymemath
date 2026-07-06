@@ -120,7 +120,7 @@ export function SingleScoreBar({ score, label, color = "#1a4fa8", animate = true
           }}
         />
       </div>
-      <span className="rm-mono" style={{ width: "28px", textAlign: "right", color, fontWeight: 700 }}>{score}</span>
+      <span className="rm-mono" style={{ width: "28px", textAlign: "right", color, fontWeight: 700 }}>{typeof score === 'number' ? score.toFixed(1) : score}</span>
     </div>
   );
 }

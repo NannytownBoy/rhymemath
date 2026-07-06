@@ -335,18 +335,23 @@ function scoreRhyming(verse: string, measured: MeasuredMetrics): { score: number
   const totalWords = lineWordCounts(lines).reduce((s, n) => s + n, 0);
   const rhymeDensity = totalWords > 0 ? (endRhymes + internalRhymes) / totalWords : 0;
 
-  // Base: end rhyme density (ideal ~0.15–0.3)
-  let base = clamp(rhymeDensity * 200); // 0.3 → 60
-  // Internal rhyme bonus
-  const internalBonus = clamp(internalRhymes * 4);
-  // Multisyllabic bonus
-  const multiBonus = multiSyll * 8;
-  // Chain bonus
-  const chainBonus = Math.min(15, (chainLen - 1) * 5);
-  // Repeated sounds
-  const soundBonus = clamp(measured.repeatedSounds * 2);
+  // Base: end rhyme density (ideal ~0.15–0.3). Capped at 50 — density alone can't win.
+  let base = Math.min(50, rhymeDensity * 180);
+  // Internal rhyme bonus — capped hard. 151 internal rhymes ≠ 100. Elite is ~30+.
+  const internalBonus = Math.min(20, internalRhymes * 0.6);
+  // Multisyllabic bonus — up to 15 pts
+  const multiBonus = Math.min(15, multiSyll * 5);
+  // Chain bonus — up to 10 pts
+  const chainBonus = Math.min(10, (chainLen - 1) * 3);
+  // Repeated sounds — up to 8 pts
+  const soundBonus = Math.min(8, measured.repeatedSounds * 0.5);
+  // End rhyme quality — bonus for consistent end rhymes across lines
+  const endRhymeBonus = Math.min(12, endRhymes * 1.2);
 
-  const score = clamp(base + internalBonus * 0.3 + multiBonus * 0.3 + chainBonus + soundBonus * 0.2);
+  // Scale so true elite (100) requires exceptional across ALL dimensions
+  const raw = base + internalBonus + multiBonus + chainBonus + soundBonus + endRhymeBonus;
+  // Max possible ≈ 50+20+15+10+8+12 = 115 → scale to 95 ceiling. 100 requires perfection.
+  const score = clamp(Math.round((raw / 115) * 95 * 10) / 10);
 
   const evidence = [
     `${endRhymes} end rhyme${endRhymes !== 1 ? "s" : ""} detected across ${lines.length} lines`,
