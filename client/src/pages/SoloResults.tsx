@@ -1,7 +1,7 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient.js";
-import { ScoreBar } from "../components/ScoreBar.js";
+import { SingleScoreBar } from "../components/ScoreBar.js";
 import VerseAnnotation from "../components/VerseAnnotation.js";
 import { getCachedResult } from "../lib/resultCache.js";
 
@@ -144,7 +144,7 @@ export default function SoloResults() {
                 <span style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", color: "#333" }}>{label}</span>
                 <span style={{ fontFamily: "Courier New, monospace", fontSize: "12px", fontWeight: "bold", color: "#1a3a7a" }}>{fmt(value)}</span>
               </div>
-              <ScoreBar score={value} color="#1a3a7a" />
+              <SingleScoreBar score={value} label="" color="#1a3a7a" animate={false} />
             </div>
           ))}
         </div>
