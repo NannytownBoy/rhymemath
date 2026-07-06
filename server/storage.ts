@@ -77,8 +77,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDynamicLeaderboard(category: string, limit: number = 20): Promise<any[]> {
-    const all = await db.select().from(comparisons);
-    const standardOnly = all.filter(c => !c.scoringMode || c.scoringMode === "standard");
+    const [allComparisons, allAnalyses] = await Promise.all([
+      db.select().from(comparisons),
+      db.select().from(analyses),
+    ]);
+    const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard");
+    const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard");
 
     const artistMap: Record<string, {
       artistName: string;
@@ -87,31 +91,40 @@ export class DatabaseStorage implements IStorage {
       count: number; wins: number; losses: number;
     }> = {};
 
-    for (const c of standardOnly) {
+    const upsert = (name: string, scores: any, win: boolean | null) => {
+      if (!name) return;
+      const key = name.toLowerCase().trim();
+      if (!artistMap[key]) {
+        artistMap[key] = { artistName: name, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, wins: 0, losses: 0 };
+      }
+      const e = artistMap[key];
+      e.totalScore += scores?.overall ?? 0;
+      e.flow += scores?.flow ?? 0;
+      e.wordplay += scores?.wordplay ?? 0;
+      e.storytelling += scores?.storytelling ?? 0;
+      e.rhyming += scores?.rhyming ?? 0;
+      e.punchlines += scores?.punchlines ?? 0;
+      e.count += 1;
+      if (win === true) e.wins += 1;
+      else if (win === false) e.losses += 1;
+      // null = solo analysis, no win/loss
+    };
+
+    // -- Battle comparisons --
+    for (const c of standardComparisons) {
       let result: any;
       try { result = JSON.parse(c.resultJson); } catch { continue; }
-
-      const addArtist = (name: string, scores: any, isWinner: boolean) => {
-        if (!name) return;
-        const key = name.toLowerCase().trim();
-        if (!artistMap[key]) {
-          artistMap[key] = { artistName: name, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, wins: 0, losses: 0 };
-        }
-        const e = artistMap[key];
-        e.totalScore += scores?.overall ?? 0;
-        e.flow += scores?.flow ?? 0;
-        e.wordplay += scores?.wordplay ?? 0;
-        e.storytelling += scores?.storytelling ?? 0;
-        e.rhyming += scores?.rhyming ?? 0;
-        e.punchlines += scores?.punchlines ?? 0;
-        e.count += 1;
-        if (isWinner) e.wins += 1; else e.losses += 1;
-      };
-
       const aWon = result.winner === "A";
       const bWon = result.winner === "B";
-      addArtist(result.artistA?.artistName, result.artistA?.scores, aWon);
-      addArtist(result.artistB?.artistName, result.artistB?.scores, bWon);
+      upsert(result.artistA?.artistName, result.artistA?.scores, aWon);
+      upsert(result.artistB?.artistName, result.artistB?.scores, bWon);
+    }
+
+    // -- Solo analyses --
+    for (const a of standardAnalyses) {
+      let result: any;
+      try { result = JSON.parse(a.resultJson); } catch { continue; }
+      upsert(a.artistName, result.scores, null);
     }
 
     const entries = Object.values(artistMap).filter(e => e.count > 0);
