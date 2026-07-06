@@ -3,6 +3,8 @@ import { useParams, Link } from "wouter";
 import { ScoreBar } from "../components/ScoreBar.js";
 import VerseAnnotation from "../components/VerseAnnotation.js";
 import type { RhymeMathResult, CategoryScore } from "../lib/types.js";
+import { getCachedResult } from "../lib/resultCache.js";
+import { apiRequest } from "../lib/queryClient.js";
 
 function copyShareLink() {
   navigator.clipboard.writeText(window.location.href).then(() => alert("Link copied!"));
@@ -11,17 +13,23 @@ function copyShareLink() {
 export default function Results() {
   const { id } = useParams<{ id: string }>();
 
-  const { data: result, isLoading, error } = useQuery<RhymeMathResult>({
+  const cachedResult = id ? getCachedResult(id) : null;
+
+  const { data: dbResult, isLoading, error } = useQuery<RhymeMathResult>({
     queryKey: ["/api/results", id],
     queryFn: async () => {
-      const res = await fetch(`/api/results/${id}`);
+      const res = await apiRequest("GET", `/api/results/${id}`);
       if (!res.ok) throw new Error("Not found");
-      return res.json();
+      const data = await res.json();
+      if (data.resultJson && typeof data.resultJson === 'string') return JSON.parse(data.resultJson);
+      return data;
     },
-    enabled: !!id,
+    enabled: !!id && !cachedResult,
   });
 
-  if (isLoading) {
+  const result = cachedResult ?? dbResult;
+
+  if (!cachedResult && isLoading) {
     return (
       <main style={{ padding: "24px", textAlign: "center", fontFamily: "Courier New, monospace" }}>
         <p>Loading result...</p>
@@ -29,7 +37,7 @@ export default function Results() {
     );
   }
 
-  if (error || !result) {
+  if (error || !result || (result as any).error) {
     return (
       <main style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
         <div className="rm-callout" style={{ borderLeftColor: "#cc0000", borderColor: "#cc0000", background: "#fff5f5" }}>

@@ -103,7 +103,7 @@ export default function Home() {
       const data = await res.json() as RhymeMathResult;
       return data;
     },
-    onSuccess: (result) => setLocation(`/results/${(result as any).resultId}`),
+    onSuccess: (result) => { cacheResult((result as any).resultId, result); setLocation(`/results/${(result as any).resultId}`); },
     onError: (err: any) => {
       if (err?.message === "NETWORK") {
         setError("Could not reach the RhymeMath server. Make sure you are on www.rhymemath.com, not a preview link.");
