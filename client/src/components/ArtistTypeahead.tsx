@@ -40,11 +40,11 @@ export default function ArtistTypeahead({ value, onChange, onSelectVerse, placeh
 
   const shouldSearch = debounced.trim().length >= 2;
 
-  // Search verses by artist name as user types
+  // Search by artist name ONLY — do not match on verse text or song title
   const { data: results = [], isFetching } = useQuery<VerseSearchResult[]>({
     queryKey: ["/api/verses/search", "artist-typeahead", debounced],
     queryFn: async () => {
-      const params = new URLSearchParams({ q: debounced.trim(), limit: "8" });
+      const params = new URLSearchParams({ artist: debounced.trim(), limit: "8" });
       const res = await apiRequest("GET", `/api/verses/search?${params.toString()}`);
       return res.json();
     },
