@@ -290,8 +290,10 @@ export function cadenceVariation(syllCounts: number[]): number {
 
 const SIMILE_PATTERNS = [/\blike\b/gi, /\bas\b.*?\bas\b/gi];
 const METAPHOR_PATTERNS = [/\b(is|are|am|was|were)\b.*\b(a|an|the)\b/gi];
-const DOUBLE_MEANING = [/\b(bang|grind|burn|drop|run|blow|move|heat|fire|ice|flow|wave|break|cut|kill|murder|body|bars|cage|trap|drill|wave)\b/gi];
+const DOUBLE_MEANING = [/\b(bang|grind|burn|drop|run|blow|move|heat|fire|ice|flow|wave|break|cut|kill|murder|body|bars|cage|trap|drill|wave|piece|cross|bar|crown|throne|cold|iron|chain|hook|bridge|verse|fly|raw|hard|sharp|deep|heat|light|ghost|chosen|frozen|brick|stone|free|bound|blind|dead|live)\b/gi];
 const CALLBACK_MARKERS = [/\b(again|back|return|revisit|remember|recall)\b/gi];
+// Repeated phrase detection: same phrase appearing 2+ times in a verse = intentional callback
+// This is handled dynamically in countWordplayIndicators via repeated line detection
 
 // ── Conceptual density: abstract/philosophical compression ──────────────────
 // Words that signal layered meaning: duality, cycles, systems, existence
@@ -344,6 +346,15 @@ export function countWordplayIndicators(verse: string): {
   CONTRAST_PATTERNS.forEach((p) => { const m = verse.match(p); contrastScore += m ? m.length : 0; });
   COMPRESSION_MARKERS.forEach((p) => { const m = verse.match(p); compressionScore += m ? m.length : 0; });
 
+  // Detect repeated phrases as intentional callbacks (e.g. "presume the unpredictable" appearing twice)
+  const linesArr = verse.split(/\n/).map(l => l.toLowerCase().trim()).filter(Boolean);
+  const phraseCount: Record<string, number> = {};
+  for (const line of linesArr) {
+    const key = line.replace(/[^a-z ]/g, '').trim();
+    if (key.length > 10) phraseCount[key] = (phraseCount[key] ?? 0) + 1;
+  }
+  callbacks += Object.values(phraseCount).filter(c => c > 1).length;
+
   const total = similes + metaphors + doublesCount + callbacks +
     Math.min(conceptualDensity, 8) +          // cap each so one dimension can't dominate
     Math.min(culturalSpecificity, 5) +
@@ -357,16 +368,16 @@ export function countWordplayIndicators(verse: string): {
 
 const TRANSITION_WORDS = /\b(then|now|before|after|when|while|because|so|but|and|yet|still|meanwhile|finally|first|next|last|suddenly|since|as|though|although|until|unless)\b/gi;
 const PRONOUN_CONSISTENCY = /\b(i|me|my|mine|myself|we|our|us)\b/gi;
-const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist)\b/gi;
+const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist|desire|conspire|inspire|aspire|salute|mourn|rage|grief|proud|honor|shame|guilt|regret|yearn|hunger|burn|ache|wound|scar|numb|raw|hollow|driven|haunted|relentless|hungry|restless|fearless|reckless|determined|faithful|loyal|betrayed|abandoned|forgotten|remembered|celebrated|revered|immortal)\b/gi;
 
 // Concrete scene-setting: specific nouns that ground a story in reality
-const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet)\b/gi;
+const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|projects|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet|rikers|island|womb|tomb|brew|crossfire|picture|wire|altar|stage|throne|crown|kingdom|battlefield|trenches|cemetery|grave|coffin|casket|vault|prison yard|rec room|visitation|courtroom|sentencing|arraignment|parole board|block party|cipher|studio|booth|track|album|tape|cd|vinyl|mic|speaker|crowd|audience|cipher|throne|altar|cross)\b/gi;
 
 // Thematic anchoring: returning to a central idea = intentional structure  
 const THEMATIC_ANCHORS = /\b(cycle|circle|repeat|again|back|return|always|never|forever|still|same|different|change|remain|continue|persist|endure|survive|legacy|generation|inheritance|bloodline|history|memory|future|past|present)\b/gi;
 
 // Character presence: other people exist in the verse = scene is populated
-const CHARACTER_PRESENCE = /\b(they|them|he|she|her|him|his|her|their|my (son|daughter|mother|father|brother|sister|friend|partner|wife|husband|homie|man|woman|girl|boy|kid|child|baby|grandma|grandpa|uncle|aunt|cousin|enemy|opps|plug|boss|judge|cop|detective|lawyer|doctor|teacher|preacher|pastor|prophet|king|queen))\b/gi;
+const CHARACTER_PRESENCE = /\b(they|them|he|she|her|him|his|their|my (son|daughter|mother|father|brother|sister|friend|partner|wife|husband|homie|man|woman|girl|boy|kid|child|baby|grandma|grandpa|uncle|aunt|cousin|enemy|opps|plug|boss|judge|cop|detective|lawyer|doctor|teacher|preacher|pastor|prophet|king|queen)|the (prophet|king|queen|chosen|villain|beast|ghost|omen|demon|angel|god|devil|savior|martyr|soldier|warrior|rebel|outlaw|fugitive|exile|prisoner|convict|criminal|innocent|witness|victim|survivor|legend|icon|giant|titan|coward|traitor|ally|enemy|oppressor|liberator|revolutionary))\b/gi;
 
 export function analyzeStorytelling(verse: string, lines: string[]): {
   transitions: number;

@@ -391,35 +391,39 @@ function scoreWordplay(verse: string): { score: number; evidence: string[] } {
   const allitWords = (verse.match(/\b([bcdfghjklmnpqrstvwxyz])\w*\s+\1\w*/gi) ?? []).length;
   const allitScore = Math.min(allitWords * 4, 12);
 
-  // --- Component 5 (NEW): conceptual density ---
-  // How many abstract/philosophical/dual-meaning concept words per line
-  // Nas: beast, yeast, savage, wisdom, imprisoned, ritual, presume = DENSE
-  const conceptScore = clamp(Math.min(indicators.conceptualDensity, 10) * 1.8); // max ~18
+  // --- Component 5: conceptual density ---
+  // Dense concept words (beast, womb, tomb, wisdom, ritual, presume) = layered meaning
+  // Non-linear scale: density >= 8 gets an elite multiplier (Nas/Rakim/Mos Def territory)
+  const rawConcept = indicators.conceptualDensity;
+  const conceptScore = rawConcept >= 10
+    ? clamp(30 + (rawConcept - 10) * 3)   // 10 hits = 30, 15 hits = 45, 20 hits = 60
+    : clamp(rawConcept * 2.5);             // < 10 hits: 1pt = 2.5, 8 hits = 20
 
-  // --- Component 6 (NEW): cultural/geographic specificity ---
-  // Naming real places, real people = grounded worldplay, not generic
-  const culturalScore = clamp(Math.min(indicators.culturalSpecificity, 6) * 2.0); // max 12
+  // --- Component 6: cultural/geographic specificity ---
+  // Real places, institutions, figures = grounded, non-generic worldplay
+  const culturalScore = clamp(Math.min(indicators.culturalSpecificity, 8) * 3.0); // max 24
 
-  // --- Component 7 (NEW): contrast / juxtaposition ---
-  // "womb to tomb", "beast rise like yeast" = contrast IS wordplay
-  const contrastScore = clamp(indicators.contrastScore * 8); // max ~16
+  // --- Component 7: contrast / juxtaposition ---
+  // "womb to tomb", "beast rise like yeast" = duality IS wordplay at elite level
+  const contrastScore = clamp(indicators.contrastScore * 15); // max ~30
 
-  // --- Component 8 (NEW): philosophical compression ---
-  // "from X to Y" constructions, extended similes = meaning packed tight
-  const compressionScore = clamp(indicators.compressionScore * 5); // max ~20
+  // --- Component 8: philosophical compression ---
+  // "from X to Y" constructions, extended similes = dense packing of meaning
+  const compressionScore = clamp(indicators.compressionScore * 7); // max ~28
 
-  // Weighted combine — conceptual and cultural dimensions are the big upgrades
+  // Weighted combine — calibrated so elite conceptual density (Nas, Rakim, Mos Def)
+  // lands in the 60-80 range while simpler wordplay lands in the 25-45 range
   const raw =
-    rhetoricalBase * 0.15 +
+    rhetoricalBase * 0.10 +
     varietyBonus +
-    assonanceScore * 0.15 +
-    anaphora * 0.10 +
-    allitScore * 0.05 +
-    conceptScore * 0.20 +      // ← NEW anchor for Nas/Rakim/Mos Def style
-    culturalScore * 0.10 +     // ← NEW rewards specificity
-    contrastScore * 0.15 +     // ← NEW rewards duality
-    compressionScore * 0.10 +  // ← NEW rewards compression
-    Math.min(12, indicators.total * 1.5);  // raw count bonus
+    assonanceScore * 0.12 +
+    anaphora * 0.08 +
+    allitScore * 0.04 +
+    conceptScore * 0.28 +      // ← primary driver — non-linear for elite density
+    culturalScore * 0.12 +     // ← specificity
+    contrastScore * 0.12 +     // ← duality/contrast
+    compressionScore * 0.10 +  // ← compression
+    Math.min(15, indicators.total * 1.8);  // raw count bonus
 
   const score = clamp(Math.round(raw));
 
