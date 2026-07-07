@@ -603,7 +603,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let bestScore = 0;
       let bestVerseTitle = "";
       let bestVerseLabel = "";
-      const analyzedTracks: { song: string; score: number }[] = [];
+      const analyzedTracks: { song: string; score: number; resultId?: string }[] = [];
 
       const recentMatchups: any[] = [];
 
@@ -638,7 +638,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (verseSong?.trim()) {
           const norm = verseSong.trim();
           if (!analyzedTracks.some(t => t.song.toLowerCase() === norm.toLowerCase())) {
-            analyzedTracks.push({ song: norm, score: Math.round((myScores.overall ?? 0) * 10) / 10 });
+            analyzedTracks.push({ song: norm, score: Math.round((myScores.overall ?? 0) * 10) / 10, resultId: c.resultId });
           }
         }
 
@@ -681,7 +681,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (a.songName?.trim()) {
           const norm = a.songName.trim();
           if (!analyzedTracks.some(t => t.song.toLowerCase() === norm.toLowerCase())) {
-            analyzedTracks.push({ song: norm, score: Math.round(overall * 10) / 10 });
+            analyzedTracks.push({ song: norm, score: Math.round(overall * 10) / 10, resultId: a.resultId });
           }
         }
       }

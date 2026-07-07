@@ -522,20 +522,41 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   // a verse where the same sounds echo across lines has been architecturally designed
   const soundArchScore = clamp(structural.crossLineEchoClusters * 3); // ↓ 4→3 (less dominant in storytelling)
 
-  // Calibrated so Nas/Verbal Intercourse (scene=11, thematic=10+, polyDict=13) → Story≈60
+  // ── Narrative Cohesion Multiplier ──────────────────────────────────────────
+  // Stream-of-consciousness verses (Cappadonna/Winter Warz, Busta/early work)
+  // have vivid imagery but NO sustained arc — they topic-hop every 2-3 lines.
+  // Narrative verses (Verbal Intercourse, Stan, I Used to Love H.E.R., Dear Mama)
+  // maintain a single subject/situation across the whole verse.
+  //
+  // narrativeCohesion ranges 0→1. We use it to scale scene + thematic scores:
+  // a verse that scene-hops deserves scene credit in WORDPLAY, not storytelling.
+  // Uncohesive verses still get a small floor so abstract-philosophy verses
+  // (Rakim-style) aren't killed by this — pure abstraction has low pivot count.
+  const cohesion = analysis.narrativeCohesion ?? 0.5; // 0=stream-of-consc, 1=tight arc
+  // Scale the imagery-based signals: full credit only when cohesion is high
+  // Floor at 0.4 so abstract/philosophical verses (low named-ref density) aren't penalized
+  const cohesionScale = Math.max(0.4, cohesion);
+
+  // Calibrated so Nas/Verbal Intercourse (scene=11, thematic=10+, polyDict=13) → Story≈62
+  // Winter Warz (scene=12, thematic=7, cohesion≈0.1) → Story≈48-52 (stream-of-consciousness)
   const raw =
-    transitionScore * 0.07 +    // ↓ transitions less weight (many are filler "but/and")
+    transitionScore * 0.07 +
     pronounScore * 0.07 +
-    emotionalScore * 0.11 +     // ↑ emotional arc matters more
+    emotionalScore * 0.11 +
     lengthScore * 0.05 +
-    sceneScore * 0.27 +         // ↑ concrete imagery is primary storytelling signal
-    thematicScore * 0.20 +      // ↑ thematic anchoring (now captures ritual/presume/legendary)
-    characterScore * 0.07 +     // world-building
-    polyDictScore * 0.12 +      // deliberate diction via polysyllabic words
-    soundArchScore * 0.05 +     // ↓ intentional sound architecture (smaller role here)
-    32;                         // ↑ base floor raised from 20 to 32
+    (sceneScore * cohesionScale) * 0.27 +   // imagery only earns storytelling credit when coherent
+    (thematicScore * cohesionScale) * 0.20 + // thematic anchoring gated by arc cohesion
+    characterScore * 0.07 +
+    polyDictScore * 0.12 +
+    soundArchScore * 0.05 +
+    32;                                      // base floor
 
   const score = clamp(Math.round(raw));
+
+  const pivotPct = Math.round((analysis.pivotRatio ?? 0) * 100);
+  const cohesionLabel = cohesion >= 0.75 ? "tight narrative arc"
+    : cohesion >= 0.45 ? "moderate arc"
+    : "stream-of-consciousness (high topic-pivot rate)";
 
   const evidence = [
     `${analysis.transitions} narrative transition word${analysis.transitions !== 1 ? "s" : ""} detected`,
@@ -543,6 +564,7 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
     `${analysis.emotionalArc} emotional arc indicator${analysis.emotionalArc !== 1 ? "s" : ""} detected`,
     `Scene detail: ${analysis.sceneDetail} concrete image${analysis.sceneDetail !== 1 ? "s" : ""} (places, objects, actions)`,
     `Thematic anchoring: ${analysis.thematicAnchoring} recurring theme marker${analysis.thematicAnchoring !== 1 ? "s" : ""}`,
+    `Narrative cohesion: ${cohesionLabel} (${pivotPct}% of lines introduce a new reference pivot)`,
     `Character presence: ${analysis.characterPresence} reference${analysis.characterPresence !== 1 ? "s" : ""} to other people/entities`,
     `Deliberate diction: ${structural.polysyllabicWordCount} polysyllabic word${structural.polysyllabicWordCount !== 1 ? "s" : ""} (3+ syllables)`,
     `Sound architecture: ${structural.crossLineEchoClusters} recurring sound cluster${structural.crossLineEchoClusters !== 1 ? "s" : ""} across verse`,

@@ -74,7 +74,7 @@ export default function RapperProfile() {
   ];
 
   const recentMatchups = profile.recentMatchups ?? profile.recentComparisons ?? [];
-  const analyzedTracks: { song: string; score: number }[] = profile.analyzedTracks ?? [];
+  const analyzedTracks: { song: string; score: number; resultId?: string }[] = profile.analyzedTracks ?? [];
 
   return (
     <main style={{ background: "#f7f5f0", minHeight: "100vh", paddingBottom: "40px" }}>
@@ -316,12 +316,29 @@ export default function RapperProfile() {
               </thead>
               <tbody>
                 {analyzedTracks.map((track, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f5f3ef" }}>
+                  <tr
+                    key={i}
+                    style={{
+                      background: i % 2 === 0 ? "#ffffff" : "#f5f3ef",
+                      cursor: track.resultId ? "pointer" : "default",
+                    }}
+                    onClick={() => track.resultId && (window.location.hash = `/results/${track.resultId}`)}
+                    title={track.resultId ? "Click to view full breakdown" : undefined}
+                  >
                     <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", color: "#999", width: "32px" }}>
                       {i + 1}.
                     </td>
-                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8", color: "#222" }}>
-                      {track.song}
+                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8" }}>
+                      {track.resultId ? (
+                        <span style={{ color: "#1a3a7a", textDecoration: "underline" }}>{track.song}</span>
+                      ) : (
+                        <span style={{ color: "#222" }}>{track.song}</span>
+                      )}
+                      {track.resultId && (
+                        <span style={{ fontFamily: "Courier New, monospace", fontSize: "9px", color: "#1a3a7a", marginLeft: "6px" }}>
+                          [view breakdown ▶]
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: "5px 14px", textAlign: "right", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", fontWeight: "bold",
                       color: track.score >= 80 ? "#006600" : track.score >= 65 ? "#1a3a7a" : "#8b0000" }}>

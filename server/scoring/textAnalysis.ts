@@ -424,6 +424,51 @@ export function analyzeStorytelling(verse: string, lines: string[]): {
   const namedCharacters = Object.values(properNameMap).filter(c => c >= 2).length;
   characterPresence += namedCharacters * 2; // each recurring proper name = strong character presence
 
+  // ── Narrative Cohesion Score ──────────────────────────────────────────────
+  // Stream-of-consciousness verses (Winter Warz) hop topics every 2-3 lines:
+  // Lebanon Don → Malcolm X → Freddy Krueger → USSR → Method Man's Jeep
+  // Narrative verses (Verbal Intercourse, Stan, I Used to Love H.E.R.) maintain
+  // a single subject/situation across most of the verse.
+  //
+  // Signal: measure the ratio of lines with SUSTAINED SUBJECT ANCHOR
+  // (first-person present + action on same topic) vs PIVOT LINES
+  // (introduces a new proper noun / cultural reference mid-verse).
+  //
+  // Method:
+  //   1. Count distinct "reference pivots": lines that introduce a NEW proper noun,
+  //      pop-culture reference, or named entity not seen in the prior line.
+  //   2. High pivot density relative to verse length = stream of consciousness.
+  //   3. Low pivot density = sustained narrative (one situation, one arc).
+
+  // Detect lines that introduce a cultural/name reference (proper noun mid-line)
+  const PIVOT_REFERENCE = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?|[A-Z]{2,})\b/g;
+  const FILLER_NAMES = new Set(['I', 'My', 'Me', 'We', 'Our', 'The', 'A', 'An', 'This', 'That', 'It', 'Its', 'He', 'She', 'His', 'Her', 'They', 'Their', 'You', 'Your']);
+  let pivotCount = 0;
+  const seenRefs = new Set<string>();
+  for (const line of lines) {
+    const words = line.split(/\s+/);
+    let linePivoted = false;
+    for (let i = 1; i < words.length; i++) { // skip first word (always capitalized)
+      const w = words[i].replace(/[^a-zA-Z]/g, '');
+      if (w.length >= 3 && /^[A-Z]/.test(w) && !FILLER_NAMES.has(w)) {
+        if (!seenRefs.has(w.toLowerCase())) {
+          seenRefs.add(w.toLowerCase());
+          linePivoted = true;
+        }
+      }
+    }
+    if (linePivoted) pivotCount++;
+  }
+
+  // pivotRatio: how many lines introduce a new reference vs total lines
+  // 0.0 = ultra-focused narrative. 1.0 = every line is a new reference hop.
+  const pivotRatio = pivotCount / Math.max(1, lines.length);
+
+  // narrativeCohesion: 0 (stream-of-consciousness) → 1 (tight narrative arc)
+  // Tuned so pivot ratio >= 0.65 (Winter Warz style) maps to cohesion ~0.0
+  //              pivot ratio <= 0.25 (Verbal Intercourse) maps to cohesion ~1.0
+  const narrativeCohesion = Math.max(0, Math.min(1, 1 - (pivotRatio - 0.25) / 0.40));
+
   return {
     transitions,
     pronounConsistency: Math.min(1, pronounMatches / Math.max(1, lines.length) * 2),
@@ -432,6 +477,8 @@ export function analyzeStorytelling(verse: string, lines: string[]): {
     thematicAnchoring,
     characterPresence,
     lineCount: lines.length,
+    narrativeCohesion,
+    pivotRatio,
   };
 }
 
