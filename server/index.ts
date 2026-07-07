@@ -85,6 +85,90 @@ async function ensureTables() {
       );
     `);
     console.log("[startup] Database tables verified/created.");
+
+    // ── Column migrations: rename old columns to match current Drizzle schema ──
+    // comparisons: artist_a → artist_a_name, song_a → song_a_name, etc.
+    await pool.query(`
+      DO $$ BEGIN
+        -- Rename artist_a → artist_a_name
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='artist_a')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='artist_a_name') THEN
+          ALTER TABLE comparisons RENAME COLUMN artist_a TO artist_a_name;
+        END IF;
+        -- Rename song_a → song_a_name
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_a')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_a_name') THEN
+          ALTER TABLE comparisons RENAME COLUMN song_a TO song_a_name;
+        END IF;
+        -- Rename verse_a → verse_a_text (if old name exists)
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a_text') THEN
+          ALTER TABLE comparisons RENAME COLUMN verse_a TO verse_a_text;
+        END IF;
+        -- Rename artist_b → artist_b_name
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='artist_b')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='artist_b_name') THEN
+          ALTER TABLE comparisons RENAME COLUMN artist_b TO artist_b_name;
+        END IF;
+        -- Rename song_b → song_b_name
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_b')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_b_name') THEN
+          ALTER TABLE comparisons RENAME COLUMN song_b TO song_b_name;
+        END IF;
+        -- Rename verse_b → verse_b_text
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b_text') THEN
+          ALTER TABLE comparisons RENAME COLUMN verse_b TO verse_b_text;
+        END IF;
+        -- Rename score_overall_a → score_a
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_overall_a')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_a') THEN
+          ALTER TABLE comparisons RENAME COLUMN score_overall_a TO score_a;
+        END IF;
+        -- Rename score_overall_b → score_b
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_overall_b')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_b') THEN
+          ALTER TABLE comparisons RENAME COLUMN score_overall_b TO score_b;
+        END IF;
+        -- Add result_id column if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='result_id') THEN
+          ALTER TABLE comparisons ADD COLUMN result_id TEXT NOT NULL DEFAULT '';
+          UPDATE comparisons SET result_id = 'legacy-' || id::text WHERE result_id = '';
+        END IF;
+        -- Add winner_name column if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='winner_name') THEN
+          ALTER TABLE comparisons ADD COLUMN winner_name TEXT NOT NULL DEFAULT '';
+        END IF;
+        -- Ensure score_a / score_b exist (add with default 0 if completely missing)
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_a') THEN
+          ALTER TABLE comparisons ADD COLUMN score_a REAL NOT NULL DEFAULT 0;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_b') THEN
+          ALTER TABLE comparisons ADD COLUMN score_b REAL NOT NULL DEFAULT 0;
+        END IF;
+        -- Fix winner column: add if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='winner') THEN
+          ALTER TABLE comparisons ADD COLUMN winner TEXT NOT NULL DEFAULT '';
+        END IF;
+        -- Add verse_label columns if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_label_a') THEN
+          ALTER TABLE comparisons ADD COLUMN verse_label_a TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_label_b') THEN
+          ALTER TABLE comparisons ADD COLUMN verse_label_b TEXT;
+        END IF;
+        -- Fix comparisons created_at: rename to bigint if timestamptz
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='comparisons' AND column_name='created_at' AND data_type='timestamp with time zone'
+        ) THEN
+          ALTER TABLE comparisons DROP COLUMN created_at;
+          ALTER TABLE comparisons ADD COLUMN created_at BIGINT NOT NULL DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+    console.log("[startup] Column migrations applied.");
+
     // Ongoing cleanup: remove test/dummy/typo entries on every boot
     const cleaned = await pool.query(`
       WITH del_analyses AS (
@@ -107,7 +191,7 @@ async function ensureTables() {
       ),
       del_comparisons AS (
         DELETE FROM comparisons
-        WHERE LOWER(TRIM(artist_a)) IN (
+        WHERE LOWER(TRIM(artist_a_name)) IN (
              'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
              'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
              'kendrick lemar lamar', 'kdot', 'k dot',
@@ -118,7 +202,7 @@ async function ensureTables() {
              'lil wayne weezy', 'weezy f baby',
              'nas nasir', 'nasir jones nas'
            )
-           OR LOWER(TRIM(artist_b)) IN (
+           OR LOWER(TRIM(artist_b_name)) IN (
              'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
              'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
              'kendrick lemar lamar', 'kdot', 'k dot',
@@ -129,8 +213,8 @@ async function ensureTables() {
              'lil wayne weezy', 'weezy f baby',
              'nas nasir', 'nasir jones nas'
            )
-           OR TRIM(artist_a) = ''
-           OR TRIM(artist_b) = ''
+           OR TRIM(artist_a_name) = ''
+           OR TRIM(artist_b_name) = ''
         RETURNING id
       )
       SELECT
