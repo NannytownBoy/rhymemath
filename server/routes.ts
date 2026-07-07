@@ -396,116 +396,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ── GET /api/rappers/:slug/live ───────────────────────────────────────────
-  // Computes a live artist profile from real comparison data
-  app.get("/api/rappers/:slug/live", async (req, res) => {
-    try {
-      const slug = req.params.slug;
-      const all = await storage.getRecentComparisons(1000);
-
-      // Match by slug (normalized name) or direct name match
-      const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-
-      const matchedComparisons = all.filter(c =>
-        toSlug(c.artistAName) === slug || toSlug(c.artistBName) === slug
-      );
-
-      if (matchedComparisons.length === 0) {
-        return res.status(404).json({ error: "No comparison data found for this artist." });
-      }
-
-      // Figure out the canonical name from the first match
-      const firstMatch = matchedComparisons[0];
-      const canonicalName = toSlug(firstMatch.artistAName) === slug
-        ? firstMatch.artistAName
-        : firstMatch.artistBName;
-
-      // Aggregate stats
-      let wins = 0, losses = 0, ties = 0;
-      let totalFlow = 0, totalWordplay = 0, totalStorytelling = 0, totalRhyming = 0, totalPunchlines = 0, totalOverall = 0;
-      let bestScore = 0;
-      let bestVerseTitle = "";
-      let bestVerseLabel = "";
-
-      const recentMatchups: any[] = [];
-
-      for (const c of matchedComparisons) {
-        let result: any;
-        try { result = JSON.parse(c.resultJson); } catch { continue; }
-
-        const isSideA = toSlug(c.artistAName) === slug;
-        const myScores = isSideA ? result.artistA?.scores : result.artistB?.scores;
-        const oppName = isSideA ? c.artistBName : c.artistAName;
-        const oppScore = isSideA ? c.scoreB : c.scoreA;
-        const myScore = isSideA ? c.scoreA : c.scoreB;
-        const verseSong = isSideA ? c.songAName : c.songBName;
-        const verseLabel = isSideA ? (c as any).verseLabelA : (c as any).verseLabelB;
-
-        if (!myScores) continue;
-
-        totalFlow += myScores.flow ?? 0;
-        totalWordplay += myScores.wordplay ?? 0;
-        totalStorytelling += myScores.storytelling ?? 0;
-        totalRhyming += myScores.rhyming ?? 0;
-        totalPunchlines += myScores.punchlines ?? 0;
-        totalOverall += myScores.overall ?? 0;
-
-        if ((myScores.overall ?? 0) > bestScore) {
-          bestScore = myScores.overall ?? 0;
-          bestVerseTitle = verseSong;
-          bestVerseLabel = verseLabel || "";
-        }
-
-        const myResult = result.winner === "TIE" ? "TIE"
-          : (isSideA && result.winner === "A") || (!isSideA && result.winner === "B") ? "W" : "L";
-        if (myResult === "W") wins++;
-        else if (myResult === "L") losses++;
-        else ties++;
-
-        recentMatchups.push({
-          resultId: c.resultId,
-          opponent: oppName,
-          opponentSong: isSideA ? c.songBName : c.songAName,
-          song: verseSong,
-          verseLabel: verseLabel || null,
-          myScore: Math.round(myScore * 10) / 10,
-          oppScore: Math.round(oppScore * 10) / 10,
-          result: myResult,
-          date: c.createdAt,
-        });
-      }
-
-      const n = matchedComparisons.length;
-      const liveProfile = {
-        name: canonicalName,
-        slug,
-        isLive: true,
-        wins,
-        losses,
-        ties,
-        totalComparisons: n,
-        winRate: n > 0 ? Math.round((wins / n) * 100) : 0,
-        overallAverage: Math.round((totalOverall / n) * 10) / 10,
-        categoryAverages: {
-          flow: Math.round((totalFlow / n) * 10) / 10,
-          wordplay: Math.round((totalWordplay / n) * 10) / 10,
-          storytelling: Math.round((totalStorytelling / n) * 10) / 10,
-          rhyming: Math.round((totalRhyming / n) * 10) / 10,
-          punchlines: Math.round((totalPunchlines / n) * 10) / 10,
-        },
-        bestVerseScore: Math.round(bestScore * 10) / 10,
-        bestVerseTitle,
-        bestVerseLabel,
-        recentMatchups: recentMatchups.sort((a, b) => b.date - a.date).slice(0, 10),
-      };
-
-      res.json(liveProfile);
-    } catch (err) {
-      console.error("Live profile error:", err);
-      res.status(500).json({ error: "Failed to build live profile." });
-    }
-  });
-
   // ── GET /api/rappers/search/live ──────────────────────────────────────────
   // Returns artists from BOTH analyses + comparisons with full category breakdowns
   app.get("/api/rappers/search/live", async (req, res) => {
@@ -639,5 +529,116 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(500).json({ error: "Search failed." });
     }
   });
+
+  // ── GET /api/rappers/:slug/live ───────────────────────────────────────────
+  // Computes a live artist profile from real comparison data
+  app.get("/api/rappers/:slug/live", async (req, res) => {
+    try {
+      const slug = req.params.slug;
+      const all = await storage.getRecentComparisons(1000);
+
+      // Match by slug (normalized name) or direct name match
+      const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+      const matchedComparisons = all.filter(c =>
+        toSlug(c.artistAName) === slug || toSlug(c.artistBName) === slug
+      );
+
+      if (matchedComparisons.length === 0) {
+        return res.status(404).json({ error: "No comparison data found for this artist." });
+      }
+
+      // Figure out the canonical name from the first match
+      const firstMatch = matchedComparisons[0];
+      const canonicalName = toSlug(firstMatch.artistAName) === slug
+        ? firstMatch.artistAName
+        : firstMatch.artistBName;
+
+      // Aggregate stats
+      let wins = 0, losses = 0, ties = 0;
+      let totalFlow = 0, totalWordplay = 0, totalStorytelling = 0, totalRhyming = 0, totalPunchlines = 0, totalOverall = 0;
+      let bestScore = 0;
+      let bestVerseTitle = "";
+      let bestVerseLabel = "";
+
+      const recentMatchups: any[] = [];
+
+      for (const c of matchedComparisons) {
+        let result: any;
+        try { result = JSON.parse(c.resultJson); } catch { continue; }
+
+        const isSideA = toSlug(c.artistAName) === slug;
+        const myScores = isSideA ? result.artistA?.scores : result.artistB?.scores;
+        const oppName = isSideA ? c.artistBName : c.artistAName;
+        const oppScore = isSideA ? c.scoreB : c.scoreA;
+        const myScore = isSideA ? c.scoreA : c.scoreB;
+        const verseSong = isSideA ? c.songAName : c.songBName;
+        const verseLabel = isSideA ? (c as any).verseLabelA : (c as any).verseLabelB;
+
+        if (!myScores) continue;
+
+        totalFlow += myScores.flow ?? 0;
+        totalWordplay += myScores.wordplay ?? 0;
+        totalStorytelling += myScores.storytelling ?? 0;
+        totalRhyming += myScores.rhyming ?? 0;
+        totalPunchlines += myScores.punchlines ?? 0;
+        totalOverall += myScores.overall ?? 0;
+
+        if ((myScores.overall ?? 0) > bestScore) {
+          bestScore = myScores.overall ?? 0;
+          bestVerseTitle = verseSong;
+          bestVerseLabel = verseLabel || "";
+        }
+
+        const myResult = result.winner === "TIE" ? "TIE"
+          : (isSideA && result.winner === "A") || (!isSideA && result.winner === "B") ? "W" : "L";
+        if (myResult === "W") wins++;
+        else if (myResult === "L") losses++;
+        else ties++;
+
+        recentMatchups.push({
+          resultId: c.resultId,
+          opponent: oppName,
+          opponentSong: isSideA ? c.songBName : c.songAName,
+          song: verseSong,
+          verseLabel: verseLabel || null,
+          myScore: Math.round(myScore * 10) / 10,
+          oppScore: Math.round(oppScore * 10) / 10,
+          result: myResult,
+          date: c.createdAt,
+        });
+      }
+
+      const n = matchedComparisons.length;
+      const liveProfile = {
+        name: canonicalName,
+        slug,
+        isLive: true,
+        wins,
+        losses,
+        ties,
+        totalComparisons: n,
+        winRate: n > 0 ? Math.round((wins / n) * 100) : 0,
+        overallAverage: Math.round((totalOverall / n) * 10) / 10,
+        categoryAverages: {
+          flow: Math.round((totalFlow / n) * 10) / 10,
+          wordplay: Math.round((totalWordplay / n) * 10) / 10,
+          storytelling: Math.round((totalStorytelling / n) * 10) / 10,
+          rhyming: Math.round((totalRhyming / n) * 10) / 10,
+          punchlines: Math.round((totalPunchlines / n) * 10) / 10,
+        },
+        bestVerseScore: Math.round(bestScore * 10) / 10,
+        bestVerseTitle,
+        bestVerseLabel,
+        recentMatchups: recentMatchups.sort((a, b) => b.date - a.date).slice(0, 10),
+      };
+
+      res.json(liveProfile);
+    } catch (err) {
+      console.error("Live profile error:", err);
+      res.status(500).json({ error: "Failed to build live profile." });
+    }
+  });
+
 
 }
