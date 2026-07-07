@@ -359,7 +359,7 @@ export default function Leaderboard() {
                 </tr>
               </thead>
               <tbody>
-                {entries!.filter((entry: any) => entry.battleCount > 0).map((entry: any, i: number) => (
+                {entries!.map((entry: any, i: number) => (
                   <tr
                     key={entry.artistName}
                     data-testid={`row-leaderboard-${i}`}

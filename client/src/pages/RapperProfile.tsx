@@ -74,6 +74,7 @@ export default function RapperProfile() {
   ];
 
   const recentMatchups = profile.recentMatchups ?? profile.recentComparisons ?? [];
+  const analyzedTracks: { song: string; score: number }[] = profile.analyzedTracks ?? [];
 
   return (
     <main style={{ background: "#f7f5f0", minHeight: "100vh", paddingBottom: "40px" }}>
@@ -94,7 +95,7 @@ export default function RapperProfile() {
             fontFamily: "Courier New, monospace", fontSize: "10px",
             padding: "3px 10px", display: "inline-block", marginBottom: "8px", fontWeight: "bold",
           }}>
-            &#9679; LIVE DATA &mdash; built from {totalComparisons} real comparison{totalComparisons !== 1 ? "s" : ""}
+            &#9679; LIVE DATA &mdash; built from {totalComparisons} real analysis{totalComparisons !== 1 ? "es" : ""}
           </div>
         )}
         {!isLive && (
@@ -296,6 +297,38 @@ export default function RapperProfile() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Analyzed Tracks — solo analyses from DB */}
+        {analyzedTracks.length > 0 && (
+          <div style={{ border: "1px solid #bbbbbb", background: "#fff", marginBottom: "12px" }}>
+            <div className="rm-section-header" style={{ margin: 0 }}>[ ANALYZED TRACKS ]</div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Arial, sans-serif", fontSize: "12px" }}>
+              <thead>
+                <tr style={{ background: "#e0e8ff" }}>
+                  <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>#</th>
+                  <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Song / Verse</th>
+                  <th style={{ padding: "5px 14px", textAlign: "right", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analyzedTracks.map((track, i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f5f3ef" }}>
+                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", color: "#999", width: "32px" }}>
+                      {i + 1}.
+                    </td>
+                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8", color: "#222" }}>
+                      {track.song}
+                    </td>
+                    <td style={{ padding: "5px 14px", textAlign: "right", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", fontWeight: "bold",
+                      color: track.score >= 80 ? "#006600" : track.score >= 65 ? "#1a3a7a" : "#8b0000" }}>
+                      {track.score.toFixed(1)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

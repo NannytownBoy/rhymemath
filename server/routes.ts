@@ -566,35 +566,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── GET /api/rappers/:slug/live ───────────────────────────────────────────
-  // Computes a live artist profile from real comparison data
+  // Computes a live artist profile from real DB data (battles + solo analyses)
   app.get("/api/rappers/:slug/live", async (req, res) => {
     try {
       const slug = req.params.slug;
-      const all = await storage.getRecentComparisons(1000);
-
-      // Match by slug (normalized name) or direct name match
       const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 
-      const matchedComparisons = all.filter(c =>
+      // Pull both battles and solos in parallel
+      const [allComparisons, allAnalyses] = await Promise.all([
+        storage.getRecentComparisons(1000),
+        storage.getRecentAnalyses(1000),
+      ]);
+
+      const matchedComparisons = allComparisons.filter(c =>
         toSlug(c.artistAName) === slug || toSlug(c.artistBName) === slug
       );
+      const matchedAnalyses = allAnalyses.filter(a => toSlug(a.artistName) === slug);
 
-      if (matchedComparisons.length === 0) {
-        return res.status(404).json({ error: "No comparison data found for this artist." });
+      if (matchedComparisons.length === 0 && matchedAnalyses.length === 0) {
+        return res.status(404).json({ error: "No data found for this artist." });
       }
 
-      // Figure out the canonical name from the first match
-      const firstMatch = matchedComparisons[0];
-      const canonicalName = toSlug(firstMatch.artistAName) === slug
-        ? firstMatch.artistAName
-        : firstMatch.artistBName;
+      // Figure out the canonical name — prefer battle data, fall back to solos
+      let canonicalName: string;
+      if (matchedComparisons.length > 0) {
+        const firstMatch = matchedComparisons[0];
+        canonicalName = toSlug(firstMatch.artistAName) === slug ? firstMatch.artistAName : firstMatch.artistBName;
+      } else {
+        canonicalName = matchedAnalyses[0].artistName;
+      }
 
-      // Aggregate stats
+      // Aggregate stats — battles + solos both contribute to score averages
       let wins = 0, losses = 0, ties = 0;
       let totalFlow = 0, totalWordplay = 0, totalStorytelling = 0, totalRhyming = 0, totalPunchlines = 0, totalOverall = 0;
+      let scoreCount = 0; // separate from matchup count — solos count for averages
       let bestScore = 0;
       let bestVerseTitle = "";
       let bestVerseLabel = "";
+      const analyzedTracks: { song: string; score: number }[] = [];
 
       const recentMatchups: any[] = [];
 
@@ -618,11 +627,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         totalRhyming += myScores.rhyming ?? 0;
         totalPunchlines += myScores.punchlines ?? 0;
         totalOverall += myScores.overall ?? 0;
+        scoreCount++;
 
         if ((myScores.overall ?? 0) > bestScore) {
           bestScore = myScores.overall ?? 0;
           bestVerseTitle = verseSong;
           bestVerseLabel = verseLabel || "";
+        }
+
+        if (verseSong?.trim()) {
+          const norm = verseSong.trim();
+          if (!analyzedTracks.some(t => t.song.toLowerCase() === norm.toLowerCase())) {
+            analyzedTracks.push({ song: norm, score: Math.round((myScores.overall ?? 0) * 10) / 10 });
+          }
         }
 
         const myResult = result.winner === "TIE" ? "TIE"
@@ -644,7 +661,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
 
-      const n = matchedComparisons.length;
+      // Solo analyses — contribute to score averages and track list, not W/L
+      for (const a of matchedAnalyses) {
+        const overall = a.scoreOverall ?? 0;
+        totalFlow += a.scoreFlow ?? 0;
+        totalWordplay += a.scoreWordplay ?? 0;
+        totalStorytelling += a.scoreStorytelling ?? 0;
+        totalRhyming += a.scoreRhyming ?? 0;
+        totalPunchlines += a.scorePunchlines ?? 0;
+        totalOverall += overall;
+        scoreCount++;
+
+        if (overall > bestScore) {
+          bestScore = overall;
+          bestVerseTitle = a.songName ?? "";
+          bestVerseLabel = a.verseLabel ?? "";
+        }
+
+        if (a.songName?.trim()) {
+          const norm = a.songName.trim();
+          if (!analyzedTracks.some(t => t.song.toLowerCase() === norm.toLowerCase())) {
+            analyzedTracks.push({ song: norm, score: Math.round(overall * 10) / 10 });
+          }
+        }
+      }
+
+      const n = scoreCount;
       const liveProfile = {
         name: canonicalName,
         slug,
@@ -652,19 +694,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         wins,
         losses,
         ties,
-        totalComparisons: n,
-        winRate: n > 0 ? Math.round((wins / n) * 100) : 0,
-        overallAverage: Math.round((totalOverall / n) * 10) / 10,
+        totalComparisons: matchedComparisons.length,
+        totalVerses: n,
+        winRate: matchedComparisons.length > 0 ? Math.round((wins / matchedComparisons.length) * 100) : 0,
+        overallAverage: n > 0 ? Math.round((totalOverall / n) * 10) / 10 : 0,
         categoryAverages: {
-          flow: Math.round((totalFlow / n) * 10) / 10,
-          wordplay: Math.round((totalWordplay / n) * 10) / 10,
-          storytelling: Math.round((totalStorytelling / n) * 10) / 10,
-          rhyming: Math.round((totalRhyming / n) * 10) / 10,
-          punchlines: Math.round((totalPunchlines / n) * 10) / 10,
+          flow: n > 0 ? Math.round((totalFlow / n) * 10) / 10 : 0,
+          wordplay: n > 0 ? Math.round((totalWordplay / n) * 10) / 10 : 0,
+          storytelling: n > 0 ? Math.round((totalStorytelling / n) * 10) / 10 : 0,
+          rhyming: n > 0 ? Math.round((totalRhyming / n) * 10) / 10 : 0,
+          punchlines: n > 0 ? Math.round((totalPunchlines / n) * 10) / 10 : 0,
         },
         bestVerseScore: Math.round(bestScore * 10) / 10,
         bestVerseTitle,
         bestVerseLabel,
+        analyzedTracks: analyzedTracks.sort((a, b) => b.score - a.score).slice(0, 10),
         recentMatchups: recentMatchups.sort((a, b) => b.date - a.date).slice(0, 10),
       };
 
