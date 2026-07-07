@@ -530,7 +530,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         count: number; recentCount: number; battleCount: number; wins: number; losses: number;
       }> = {};
 
-      const upsert = (name: string, scores: any, win: boolean | null, createdAt: number) => {
+      const upsert = (name: string, scores: any, win: boolean | null, createdAt: number, isBattle: boolean = true) => {
         if (!name?.trim()) return;
         const key = name.toLowerCase().trim();
         if (BLOCKLIST.has(key)) return;
@@ -547,8 +547,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         e.punchlines += scores?.punchlines ?? 0;
         e.count += 1;
         if (createdAt >= oneDayAgo) e.recentCount += 1;
-        if (win === true) { e.wins += 1; e.battleCount += 1; }
-        else if (win === false) { e.losses += 1; e.battleCount += 1; }
+        if (isBattle) {
+          e.battleCount += 1;
+          if (win === true) e.wins += 1;
+          else if (win === false) e.losses += 1;
+          // null = TIE, battleCount still increments
+        }
       };
 
       // Pull comparisons + analyses in parallel
@@ -557,25 +561,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         storage.getRecentAnalyses(1000),
       ]);
 
-      // -- Battle comparisons --
+      // -- Battle comparisons: use DB columns for names/winner, JSON for category scores --
       for (const c of allComparisons) {
         if (c.scoringMode && c.scoringMode !== "standard") continue;
-        let result: any = null;
-        try { result = JSON.parse((c as any).resultJson); } catch { continue; }
-        const aWon = result?.winner === "A";
-        const bWon = result?.winner === "B";
+        let aScores: any = null;
+        let bScores: any = null;
+        try {
+          const parsed = JSON.parse((c as any).resultJson);
+          aScores = parsed?.artistA?.scores ?? null;
+          bScores = parsed?.artistB?.scores ?? null;
+        } catch { /* use nulls */ }
         const ts = typeof c.createdAt === "number" ? c.createdAt : Date.parse(c.createdAt as any);
-        upsert(result?.artistA?.artistName ?? c.artistAName, result?.artistA?.scores, aWon, ts);
-        upsert(result?.artistB?.artistName ?? c.artistBName, result?.artistB?.scores, bWon, ts);
+        // Use DB columns for names and winner — authoritative
+        const aWinFlag = c.winner === "TIE" ? null : c.winner === "A" ? true : false;
+        const bWinFlag = c.winner === "TIE" ? null : c.winner === "B" ? true : false;
+        upsert(c.artistAName, aScores ?? { overall: c.scoreA }, aWinFlag, ts, true);
+        upsert(c.artistBName, bScores ?? { overall: c.scoreB }, bWinFlag, ts, true);
       }
 
-      // -- Solo analyses --
+      // -- Solo analyses: use stored score columns --
       for (const a of allAnalyses) {
         if (a.scoringMode && a.scoringMode !== "standard") continue;
-        let result: any = null;
-        try { result = JSON.parse((a as any).resultJson); } catch { continue; }
         const ts = typeof a.createdAt === "number" ? a.createdAt : Date.parse(a.createdAt as any);
-        upsert(a.artistName, result?.scores, null, ts);
+        upsert(a.artistName, {
+          overall: a.scoreOverall,
+          flow: a.scoreFlow,
+          wordplay: a.scoreWordplay,
+          storytelling: a.scoreStorytelling,
+          rhyming: a.scoreRhyming,
+          punchlines: a.scorePunchlines,
+        }, null, ts, false);
       }
 
       let results = Object.values(artistMap)
