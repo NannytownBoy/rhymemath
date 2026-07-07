@@ -128,8 +128,8 @@ export class DatabaseStorage implements IStorage {
       db.select().from(comparisons),
       db.select().from(analyses),
     ]);
-    const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard");
-    const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard");
+    const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard" || c.scoringMode.startsWith("standard-"));
+    const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-"));
 
     // Title-case helper for display names
     const toTitleCase = (s: string) =>

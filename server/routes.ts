@@ -5,6 +5,23 @@ import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
 
+// ── Scoring version — bump when formula changes significantly ─────────────────
+const SCORING_VERSION = "v2";
+
+// ── Title-case helper for artist names and song titles ────────────────────────
+function toTitleCase(s: string): string {
+  if (!s) return s;
+  const MINORS = new Set(['a','an','the','and','but','or','for','nor','on','at','to','by','in','of','up','as','is','it','if']);
+  return s.trim().replace(/\w\S*/g, (word, offset) => {
+    const lower = word.toLowerCase();
+    // Always capitalize first and last word, and words not in minor list
+    if (offset === 0 || !MINORS.has(lower)) {
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }
+    return lower;
+  });
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
 
   // ── POST /api/score ───────────────────────────────────────────────────────
@@ -74,15 +91,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       };
 
       // Persist result — DB failure is non-fatal, user still gets their result
+      const cleanArtistA = toTitleCase(artistA);
+      const cleanSongA   = toTitleCase(songA);
+      const cleanArtistB = toTitleCase(artistB);
+      const cleanSongB   = toTitleCase(songB);
       try {
         await storage.saveComparison({
           resultId: finalResult.resultId,
-          artistAName: artistA,
-          songAName: songA,
+          artistAName: cleanArtistA,
+          songAName: cleanSongA,
           verseA: effectiveVerseA,
           verseLabelA: verseLabelA || null,
-          artistBName: artistB,
-          songBName: songB,
+          artistBName: cleanArtistB,
+          songBName: cleanSongB,
           verseB: effectiveVerseB,
           verseLabelB: verseLabelB || null,
           winner: finalResult.winner,
@@ -90,7 +111,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           confidence: finalResult.confidence,
           scoreA: finalResult.artistA.scores.overall,
           scoreB: finalResult.artistB.scores.overall,
-          scoringMode: isCustom ? "custom" : "standard",
+          scoringMode: isCustom ? `custom-${SCORING_VERSION}` : `standard-${SCORING_VERSION}`,
           customWeights: isCustom ? JSON.stringify(rawWeights) : null,
           resultJson: JSON.stringify(resultWithMode),
           createdAt: Date.now(),
@@ -135,13 +156,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
 
       try {
+        const cleanArtistName = toTitleCase(artistName);
+        const cleanSongName   = toTitleCase(songName);
         await storage.saveAnalysis({
           resultId: result.resultId,
-          artistName,
-          songName,
+          artistName: cleanArtistName,
+          songName: cleanSongName,
           verseLabel: verseLabel || null,
           verse: effectiveVerse,
-          scoringMode: isCustom ? "custom" : "standard",
+          scoringMode: isCustom ? `custom-${SCORING_VERSION}` : `standard-${SCORING_VERSION}`,
           customWeights: isCustom ? JSON.stringify(rawWeights) : null,
           resultJson: JSON.stringify(result),
           scoreOverall: result.scores.overall,
@@ -453,7 +476,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // -- Battle comparisons: use DB columns for names/winner, JSON for category scores --
       for (const c of allComparisons) {
-        if (c.scoringMode && c.scoringMode !== "standard") continue;
+        const cMode = c.scoringMode ?? "standard";
+        if (cMode !== "standard" && cMode !== `standard-${SCORING_VERSION}`) continue;
         let aScores: any = null;
         let bScores: any = null;
         try {
@@ -471,7 +495,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // -- Solo analyses: use stored score columns --
       for (const a of allAnalyses) {
-        if (a.scoringMode && a.scoringMode !== "standard") continue;
+        const aMode = a.scoringMode ?? "standard";
+        if (aMode !== "standard" && aMode !== `standard-${SCORING_VERSION}`) continue;
         const ts = typeof a.createdAt === "number" ? a.createdAt : Date.parse(a.createdAt as any);
         upsert(a.artistName, {
           overall: a.scoreOverall,
