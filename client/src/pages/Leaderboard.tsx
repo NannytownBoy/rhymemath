@@ -413,7 +413,7 @@ export default function Leaderboard() {
                         : <span style={{ color: "#aaa", fontWeight: 400 }}>--</span>}
                     </td>
                     <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#666" }}>
-                      {entry.battleCount > 0 ? entry.battleCount : "—"}
+                      {entry.comparisons > 0 ? entry.comparisons : "—"}
                     </td>
                   </tr>
                 ))}
@@ -423,7 +423,7 @@ export default function Leaderboard() {
         </div>
 
         <p style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#999", marginTop: "8px" }}>
-          * W-L = battle record only. Verses Input = total verses submitted in battles. Only artists who have appeared in at least one battle are shown. Click any artist to see full score breakdown.
+          * W-L = battle record only (-- means no head-to-head battles yet). Verses Input = total solo + battle analyses submitted. Click any artist to see full score breakdown.
         </p>
       </div>
     </main>
