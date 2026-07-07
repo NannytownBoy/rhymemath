@@ -12,6 +12,7 @@ import Leaderboard from "./pages/Leaderboard.js";
 import About from "./pages/About.js";
 import Community from "./pages/Community.js";
 import Terms from "./pages/Terms.js";
+import Privacy from "./pages/Privacy.js";
 import SoloResults from "./pages/SoloResults.js";
 import NotFound from "./pages/not-found.js";
 
@@ -84,7 +85,7 @@ function Footer() {
           {" | "}
           <a href="/#/community" style={{ color: "#aabbdd" }}>Community</a>
           {" | "}
-          <a href="/#/terms" style={{ color: "#aabbdd" }}>Terms of Service</a>
+          <a href="/#/terms" style={{ color: "#aabbdd" }}>Terms of Service</a> &nbsp;|&nbsp; <a href="/#/privacy" style={{ color: "#aabbdd" }}>Privacy Policy</a>
           {" | "}
           <a href="mailto:notices@rhymemath.com" style={{ color: "#aabbdd" }}>notices@rhymemath.com</a>
         </p>
@@ -107,6 +108,7 @@ function AppRoutes() {
           <Route path="/community" component={Community} />
           <Route path="/about" component={About} />
           <Route path="/terms" component={Terms} />
+          <Route path="/privacy" component={Privacy} />
           <Route path="/analysis/:id" component={SoloResults} />
           <Route component={NotFound} />
         </Switch>
