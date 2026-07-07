@@ -143,11 +143,25 @@ function multisyllabicRhymeChains(lines: string[]): number {
 // Detect phrase symmetry: lines starting with same word(s) = anaphora
 function phraseSymmetryScore(lines: string[]): number {
   if (lines.length < 2) return 0;
+
+  // 1. Line-start anaphora: same first word across multiple lines
   const firstWords = lines.map(l => l.trim().toLowerCase().split(/\s+/)[0] ?? "");
   const wordMap: Record<string, number> = {};
   for (const w of firstWords) if (w.length > 1) wordMap[w] = (wordMap[w] ?? 0) + 1;
   const parallelCount = Object.values(wordMap).filter(c => c >= 2).length;
-  return Math.min(parallelCount * 8, 20); // max 20 pts
+
+  // 2. Within-line repetition: "chain chain chain" or "word word" = deliberate scheme
+  // This catches Kendrick's "chain chain chain, whip whip whip" pattern
+  let withinLineReps = 0;
+  for (const line of lines) {
+    const words = line.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
+    const wMap: Record<string, number> = {};
+    for (const w of words) wMap[w] = (wMap[w] ?? 0) + 1;
+    if (Object.values(wMap).some(c => c >= 2)) withinLineReps++;
+  }
+
+  const total = parallelCount * 8 + withinLineReps * 3;
+  return Math.min(total, 20); // max 20 pts
 }
 
 // Count internal assonance: vowel sound groups repeating per line

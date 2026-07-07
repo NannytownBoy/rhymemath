@@ -109,8 +109,7 @@ export default function Rappers() {
                   <tr style={{ background: "#004400" }}>
                     <th style={{ padding: "6px 12px", textAlign: "left", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>Artist</th>
                     <th style={{ padding: "6px 12px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>Avg</th>
-                    <th style={{ padding: "6px 12px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>W-L</th>
-                    <th style={{ padding: "6px 12px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>Bouts</th>
+                    <th style={{ padding: "6px 12px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>Verses</th>
                     <th style={{ padding: "6px 12px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaffaa" }}>Profile</th>
                   </tr>
                 </thead>
@@ -141,11 +140,6 @@ export default function Rappers() {
                           <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "13px", fontWeight: 700, color: "#222" }}>
                             {typeof a.avgScore === "number" ? a.avgScore.toFixed(1) : "—"}
                           </td>
-                          <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", fontWeight: 700 }}>
-                            {a.battleCount > 0
-                              ? <span><span style={{ color: "#006600" }}>{a.wins}</span><span style={{ color: "#555" }}>-</span><span style={{ color: "#8b0000" }}>{a.losses}</span></span>
-                              : <span style={{ color: "#aaa", fontWeight: 400 }}>--</span>}
-                          </td>
                           <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#666" }}>
                             {a.comparisons}
                           </td>
@@ -164,19 +158,32 @@ export default function Rappers() {
                         {/* Expanded stat breakdown */}
                         {isExpanded && (
                           <tr key={`${a.slug}-expanded`} style={{ background: i % 2 === 0 ? "#fff" : "#f5f3ef", borderBottom: "1px solid #ddd" }}>
-                            <td colSpan={5} style={{ padding: "12px 20px 16px" }}>
+                            <td colSpan={4} style={{ padding: "12px 20px 16px" }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", maxWidth: "600px" }}>
                                 <div>
                                   <StatBar label="Flow" value={a.avgFlow} color="#1a3a7a" />
                                   <StatBar label="Wordplay" value={a.avgWordplay} color="#5c2d91" />
                                   <StatBar label="Storytelling" value={a.avgStorytelling} color="#006600" />
-                                </div>
-                                <div>
                                   <StatBar label="Rhyming" value={a.avgRhyming} color="#8b4513" />
                                   <StatBar label="Punchlines" value={a.avgPunchlines} color="#8b0000" />
+                                </div>
+                                <div>
+                                  {a.tracks && a.tracks.length > 0 ? (
+                                    <div>
+                                      <div style={{ fontFamily: "Arial, sans-serif", fontSize: "10px", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>Analyzed Tracks</div>
+                                      {a.tracks.map((t: any, ti: number) => (
+                                        <div key={ti} style={{ display: "flex", justifyContent: "space-between", fontFamily: "Courier New, monospace", fontSize: "11px", color: "#333", marginBottom: "3px", gap: "8px" }}>
+                                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.song}</span>
+                                          <span style={{ fontWeight: 700, color: "#1a3a7a", flexShrink: 0 }}>{t.score.toFixed(1)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#aaa" }}>No tracks logged yet</div>
+                                  )}
                                   <div style={{ marginTop: "10px", fontFamily: "Courier New, monospace", fontSize: "10px", color: "#888" }}>
                                     {a.comparisons} verse{a.comparisons !== 1 ? "s" : ""} analyzed
-                                    {a.battleCount > 0 && ` · ${a.wins}W-${a.losses}L in battle`}
+                                    {a.battleCount > 0 && ` · ${a.wins}W-${a.losses}L`}
                                     {a.battleCount > 0 && ` · ${a.winRate}% win rate`}
                                   </div>
                                 </div>

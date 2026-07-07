@@ -442,15 +442,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         totalScore: number; flow: number; wordplay: number;
         storytelling: number; rhyming: number; punchlines: number;
         count: number; recentCount: number; battleCount: number; wins: number; losses: number;
+        tracks: Array<{ song: string; score: number }>;
       }> = {};
 
-      const upsert = (name: string, scores: any, win: boolean | null, createdAt: number, isBattle: boolean = true) => {
+      const upsert = (name: string, scores: any, win: boolean | null, createdAt: number, isBattle: boolean = true, songName?: string) => {
         if (!name?.trim()) return;
         const key = name.toLowerCase().trim();
         if (BLOCKLIST.has(key)) return;
         const slug = toSlug(name);
         if (!artistMap[slug]) {
-          artistMap[slug] = { name: toTitleCase(name), slug, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, recentCount: 0, battleCount: 0, wins: 0, losses: 0 };
+          artistMap[slug] = { name: toTitleCase(name), slug, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, recentCount: 0, battleCount: 0, wins: 0, losses: 0, tracks: [] };
         }
         const e = artistMap[slug];
         e.totalScore += scores?.overall ?? 0;
@@ -466,6 +467,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (win === true) e.wins += 1;
           else if (win === false) e.losses += 1;
           // null = TIE, battleCount still increments
+        }
+        // Track analyzed songs (deduplicated by song name)
+        if (songName?.trim()) {
+          const normalSong = toTitleCase(songName.trim());
+          if (!e.tracks.some(t => t.song.toLowerCase() === normalSong.toLowerCase())) {
+            e.tracks.push({ song: normalSong, score: Math.round((scores?.overall ?? 0) * 10) / 10 });
+          }
         }
       };
 
@@ -490,8 +498,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         // Use DB columns for names and winner — authoritative
         const aWinFlag = c.winner === "TIE" ? null : c.winner === "A" ? true : false;
         const bWinFlag = c.winner === "TIE" ? null : c.winner === "B" ? true : false;
-        upsert(c.artistAName, aScores ?? { overall: c.scoreA }, aWinFlag, ts, true);
-        upsert(c.artistBName, bScores ?? { overall: c.scoreB }, bWinFlag, ts, true);
+        upsert(c.artistAName, aScores ?? { overall: c.scoreA }, aWinFlag, ts, true, c.songAName);
+        upsert(c.artistBName, bScores ?? { overall: c.scoreB }, bWinFlag, ts, true, c.songBName);
       }
 
       // -- Solo analyses: use stored score columns --
@@ -506,7 +514,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           storytelling: a.scoreStorytelling,
           rhyming: a.scoreRhyming,
           punchlines: a.scorePunchlines,
-        }, null, ts, false);
+        }, null, ts, false, a.songName);
       }
 
       let results = Object.values(artistMap)
@@ -526,6 +534,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           avgStorytelling: e.count > 0 ? Math.round((e.storytelling / e.count) * 10) / 10 : 0,
           avgRhyming:      e.count > 0 ? Math.round((e.rhyming      / e.count) * 10) / 10 : 0,
           avgPunchlines:   e.count > 0 ? Math.round((e.punchlines   / e.count) * 10) / 10 : 0,
+          tracks: e.tracks.sort((a, b) => b.score - a.score).slice(0, 5), // top 5 by score
         }));
 
       if (query) {

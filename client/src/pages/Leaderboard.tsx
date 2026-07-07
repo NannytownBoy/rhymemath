@@ -355,11 +355,11 @@ export default function Leaderboard() {
                   <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold", textTransform: "uppercase" }}>{getScoreLabel(category)}</th>
                   <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Best</th>
                   <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>W-L</th>
-                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Bouts</th>
+                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Verses Input</th>
                 </tr>
               </thead>
               <tbody>
-                {entries!.map((entry: any, i: number) => (
+                {entries!.filter((entry: any) => entry.battleCount > 0).map((entry: any, i: number) => (
                   <tr
                     key={entry.artistName}
                     data-testid={`row-leaderboard-${i}`}
@@ -423,7 +423,7 @@ export default function Leaderboard() {
         </div>
 
         <p style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#999", marginTop: "8px" }}>
-          * W-L = battle record only. Bouts = battles fought. Click any artist name to see all verses analyzed + full score breakdown.
+          * W-L = battle record only. Verses Input = total verses submitted in battles. Only artists who have appeared in at least one battle are shown. Click any artist to see full score breakdown.
         </p>
       </div>
     </main>

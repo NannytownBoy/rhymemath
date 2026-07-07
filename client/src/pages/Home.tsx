@@ -123,8 +123,16 @@ export default function Home() {
       setError("Artist name and song title are required.");
       return;
     }
+    if (!verseA.trim()) {
+      setError("Lyrics are required. Paste the verse before submitting.");
+      return;
+    }
     if (appMode === "battle" && (!artistB.trim() || !songB.trim())) {
       setError("Artist name and song title are required for both sides.");
+      return;
+    }
+    if (appMode === "battle" && !verseB.trim()) {
+      setError("Lyrics are required for both sides. Paste the verse before submitting.");
       return;
     }
     if (scoringMode === "custom" && !weightValid) {

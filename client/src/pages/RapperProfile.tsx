@@ -16,32 +16,19 @@ function timeAgo(ts: number) {
 export default function RapperProfile() {
   const { slug } = useParams<{ slug: string }>();
 
-  // Try live data first (real comparisons)
-  const { data: liveProfile, isLoading: liveLoading } = useQuery<any>({
+  // Live data only — no mock fallback
+  const { data: liveProfile, isLoading } = useQuery<any>({
     queryKey: ["/api/rappers", slug, "live"],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/rappers/${slug}/live`);
-      if (!res.ok) throw new Error("No live data");
+      if (!res.ok) return null;
       return res.json();
     },
     enabled: !!slug,
     retry: false,
   });
 
-  // Fall back to mock artist data
-  const { data: mockArtist, isLoading: mockLoading } = useQuery<any>({
-    queryKey: ["/api/rappers", slug],
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/rappers/${slug}`);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!slug && !liveProfile,
-    retry: false,
-  });
-
-  const isLoading = liveLoading || (mockLoading && !liveProfile);
-  const profile = liveProfile || mockArtist;
+  const profile = liveProfile;
 
   if (isLoading) {
     return (

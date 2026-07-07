@@ -368,10 +368,10 @@ export function countWordplayIndicators(verse: string): {
 
 const TRANSITION_WORDS = /\b(then|now|before|after|when|while|because|so|but|and|yet|still|meanwhile|finally|first|next|last|suddenly|since|as|though|although|until|unless)\b/gi;
 const PRONOUN_CONSISTENCY = /\b(i|me|my|mine|myself|we|our|us)\b/gi;
-const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist|desire|conspire|inspire|aspire|salute|mourn|rage|grief|proud|honor|shame|guilt|regret|yearn|hunger|burn|ache|wound|scar|numb|raw|hollow|driven|haunted|relentless|hungry|restless|fearless|reckless|determined|faithful|loyal|betrayed|abandoned|forgotten|remembered|celebrated|revered|immortal|tired|losing|control|redemption|sinister|divine|psychosis|focused|focus|sickest|illest|killing|dead|dying|crying|trying|grinding|rising|falling|striving|thriving|struggling|hustling|grinding|pushing|praying|believing|doubting|breaking|falling|climbing|drowning|floating|fading|glowing)\b/gi;
+const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist|desire|conspire|inspire|aspire|salute|mourn|rage|grief|proud|honor|shame|guilt|regret|yearn|hunger|burn|ache|wound|scar|numb|raw|hollow|driven|haunted|relentless|hungry|restless|fearless|reckless|determined|faithful|loyal|betrayed|abandoned|forgotten|remembered|celebrated|revered|immortal|tired|losing|control|redemption|sinister|divine|psychosis|focused|focus|sickest|illest|killing|dead|dying|crying|trying|grinding|rising|falling|striving|thriving|struggling|hustling|pushing|praying|believing|doubting|breaking|climbing|drowning|floating|fading|glowing|beautiful|beauty|warm|warmth|wonderful|special|precious|sweet|gentle|lonely|alone|empty|miss|missed|missing|proud of|proud|grateful|thankful|heartbroken|heartbreak|devastated|overwhelmed|peaceful|content|blessed|cursed|bitter|melancholy|nostalgic|wistful|tender|vulnerable|raw|fierce|electric|alive|free|trapped|suffocated|liberated|broken down|built up|torn apart|put together)\b/gi;
 
 // Concrete scene-setting: specific nouns that ground a story in reality
-const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|projects|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet|rikers|island|womb|tomb|brew|crossfire|picture|wire|altar|stage|throne|crown|kingdom|battlefield|trenches|cemetery|grave|coffin|casket|vault|prison yard|rec room|visitation|courtroom|sentencing|arraignment|parole board|block party|cipher|studio|booth|track|album|tape|cd|vinyl|mic|speaker|crowd|audience|cipher|throne|altar|cross)\b/gi;
+const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|projects|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet|rikers|island|womb|tomb|brew|crossfire|picture|wire|altar|stage|throne|crown|kingdom|battlefield|trenches|cemetery|grave|coffin|casket|vault|prison yard|rec room|visitation|courtroom|sentencing|arraignment|parole board|block party|cipher|studio|booth|track|album|tape|cd|vinyl|mic|speaker|crowd|audience|cipher|throne|altar|cross|tv|television|couch|sofa|living room|shadow|mirror|rearview|playground|pigeons|pigeon|storm|prayer|letter|call|conversation|porch|stoop|street corner|hospital room|funeral|coffin lid|headstone|photograph|old photo|memory lane|kitchen table|dinner table|phone call|text message|voice mail|jail cell|holding cell|booking|arraignment|plea|sentencing|visiting room|bus stop|subway|metro|cab|uber|lyft|airport|terminal|gate|boarding|landing|hotel|motel|inn|lobby|elevator|hallway|staircase|rooftop|fire escape|basement|attic|closet|garage|driveway|front yard|backyard|patio|balcony|pool|barbecue|cookout|block party|park bench|swing|slide|jungle gym)\b/gi;
 
 // Thematic anchoring: returning to a central idea = intentional structure
 // Expanded to capture Nas/Rakim-style philosophical recurrence:
@@ -396,7 +396,23 @@ export function analyzeStorytelling(verse: string, lines: string[]): {
   const emotionalMatches = (verse.match(EMOTIONAL_WORDS) ?? []).length;
   const sceneDetail = (verse.match(SCENE_SETTING) ?? []).length;
   const thematicAnchoring = (verse.match(THEMATIC_ANCHORS) ?? []).length;
-  const characterPresence = (verse.match(CHARACTER_PRESENCE) ?? []).length;
+  let characterPresence = (verse.match(CHARACTER_PRESENCE) ?? []).length;
+
+  // Named character detection: a proper name (Capitalized, 4+ chars, not at sentence start)
+  // that appears 2+ times in the verse = the verse is about someone specific (Sasha, etc.)
+  const properNameMap: Record<string, number> = {};
+  for (const line of lines) {
+    const words = line.split(/\s+/);
+    for (let i = 1; i < words.length; i++) { // skip first word (always capitalized)
+      const w = words[i].replace(/[^a-zA-Z]/g, '');
+      if (w.length >= 4 && /^[A-Z]/.test(w) && /^[a-z]/.test(w.slice(1))) {
+        properNameMap[w.toLowerCase()] = (properNameMap[w.toLowerCase()] ?? 0) + 1;
+      }
+    }
+  }
+  const namedCharacters = Object.values(properNameMap).filter(c => c >= 2).length;
+  characterPresence += namedCharacters * 2; // each recurring proper name = strong character presence
+
   return {
     transitions,
     pronounConsistency: Math.min(1, pronounMatches / Math.max(1, lines.length) * 2),
