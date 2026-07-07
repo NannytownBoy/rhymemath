@@ -100,10 +100,11 @@ async function ensureTables() {
           AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_a_name') THEN
           ALTER TABLE comparisons RENAME COLUMN song_a TO song_a_name;
         END IF;
-        -- Rename verse_a → verse_a_text (if old name exists)
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a_text') THEN
-          ALTER TABLE comparisons RENAME COLUMN verse_a TO verse_a_text;
+        -- verse_a stays as verse_a (schema expects verse_a) -- no rename needed
+        -- If a previous bad migration renamed verse_a → verse_a_text, fix it back
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a_text')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_a') THEN
+          ALTER TABLE comparisons RENAME COLUMN verse_a_text TO verse_a;
         END IF;
         -- Rename artist_b → artist_b_name
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='artist_b')
@@ -115,10 +116,11 @@ async function ensureTables() {
           AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='song_b_name') THEN
           ALTER TABLE comparisons RENAME COLUMN song_b TO song_b_name;
         END IF;
-        -- Rename verse_b → verse_b_text
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b_text') THEN
-          ALTER TABLE comparisons RENAME COLUMN verse_b TO verse_b_text;
+        -- verse_b stays as verse_b (schema expects verse_b) -- no rename needed
+        -- If a previous bad migration renamed verse_b → verse_b_text, fix it back
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b_text')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='verse_b') THEN
+          ALTER TABLE comparisons RENAME COLUMN verse_b_text TO verse_b;
         END IF;
         -- Rename score_overall_a → score_a
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comparisons' AND column_name='score_overall_a')
