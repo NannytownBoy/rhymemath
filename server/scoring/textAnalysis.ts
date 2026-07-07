@@ -351,7 +351,7 @@ export function countWordplayIndicators(verse: string): {
   const phraseCount: Record<string, number> = {};
   for (const line of linesArr) {
     const key = line.replace(/[^a-z ]/g, '').trim();
-    if (key.length > 10) phraseCount[key] = (phraseCount[key] ?? 0) + 1;
+    if (key.length > 7) phraseCount[key] = (phraseCount[key] ?? 0) + 1; // >7 catches "rigamortis", "the ritual"
   }
   callbacks += Object.values(phraseCount).filter(c => c > 1).length;
 
@@ -368,13 +368,16 @@ export function countWordplayIndicators(verse: string): {
 
 const TRANSITION_WORDS = /\b(then|now|before|after|when|while|because|so|but|and|yet|still|meanwhile|finally|first|next|last|suddenly|since|as|though|although|until|unless)\b/gi;
 const PRONOUN_CONSISTENCY = /\b(i|me|my|mine|myself|we|our|us)\b/gi;
-const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist|desire|conspire|inspire|aspire|salute|mourn|rage|grief|proud|honor|shame|guilt|regret|yearn|hunger|burn|ache|wound|scar|numb|raw|hollow|driven|haunted|relentless|hungry|restless|fearless|reckless|determined|faithful|loyal|betrayed|abandoned|forgotten|remembered|celebrated|revered|immortal)\b/gi;
+const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist|desire|conspire|inspire|aspire|salute|mourn|rage|grief|proud|honor|shame|guilt|regret|yearn|hunger|burn|ache|wound|scar|numb|raw|hollow|driven|haunted|relentless|hungry|restless|fearless|reckless|determined|faithful|loyal|betrayed|abandoned|forgotten|remembered|celebrated|revered|immortal|tired|losing|control|redemption|sinister|divine|psychosis|focused|focus|sickest|illest|killing|dead|dying|crying|trying|grinding|rising|falling|striving|thriving|struggling|hustling|grinding|pushing|praying|believing|doubting|breaking|falling|climbing|drowning|floating|fading|glowing)\b/gi;
 
 // Concrete scene-setting: specific nouns that ground a story in reality
 const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|projects|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet|rikers|island|womb|tomb|brew|crossfire|picture|wire|altar|stage|throne|crown|kingdom|battlefield|trenches|cemetery|grave|coffin|casket|vault|prison yard|rec room|visitation|courtroom|sentencing|arraignment|parole board|block party|cipher|studio|booth|track|album|tape|cd|vinyl|mic|speaker|crowd|audience|cipher|throne|altar|cross)\b/gi;
 
-// Thematic anchoring: returning to a central idea = intentional structure  
-const THEMATIC_ANCHORS = /\b(cycle|circle|repeat|again|back|return|always|never|forever|still|same|different|change|remain|continue|persist|endure|survive|legacy|generation|inheritance|bloodline|history|memory|future|past|present)\b/gi;
+// Thematic anchoring: returning to a central idea = intentional structure
+// Expanded to capture Nas/Rakim-style philosophical recurrence:
+//   ritual/presume/unpredictable/pinnacle/legendary/invincible = thematic weight words
+//   womb/tomb/beast/yeast/east = recurring sonic-thematic clusters
+const THEMATIC_ANCHORS = /\b(cycle|circle|repeat|again|back|return|always|never|forever|still|same|different|change|remain|continue|persist|endure|survive|legacy|generation|inheritance|bloodline|history|memory|future|past|present|ritual|rituals|presume|unpredictable|nonchalant|pinnacle|synonymous|legendary|invincible|inevitable|womb|tomb|yeast|east|beast|unleashed|released|prophecy|prophetic|sovereign|eternal|mortal|transcend|divine|illusion|reality|consciousness)\b/gi;
 
 // Character presence: other people exist in the verse = scene is populated
 const CHARACTER_PRESENCE = /\b(they|them|he|she|her|him|his|their|my (son|daughter|mother|father|brother|sister|friend|partner|wife|husband|homie|man|woman|girl|boy|kid|child|baby|grandma|grandpa|uncle|aunt|cousin|enemy|opps|plug|boss|judge|cop|detective|lawyer|doctor|teacher|preacher|pastor|prophet|king|queen)|the (prophet|king|queen|chosen|villain|beast|ghost|omen|demon|angel|god|devil|savior|martyr|soldier|warrior|rebel|outlaw|fugitive|exile|prisoner|convict|criminal|innocent|witness|victim|survivor|legend|icon|giant|titan|coward|traitor|ally|enemy|oppressor|liberator|revolutionary))\b/gi;
@@ -465,4 +468,80 @@ export function normalize(value: number, min: number, max: number): number {
 // Clamp a value to [0,100]
 export function clamp(v: number): number {
   return Math.max(0, Math.min(100, v));
+}
+
+// ── Structural Lyricism Analysis ─────────────────────────────────────────────
+// Rules that measure craft signals a keyword scanner can't catch:
+//   A. Internal rhyme pairs — within-line word echoes (womb/tomb, wire/desire/conspire)
+//   B. Cross-line sound clusters — same rhyme key recurring 3+ times across the verse
+//   C. Polysyllabic rhyme pairs — long words rhyming together (presidents/represent)
+//   D. Complex echo lines — single lines with 2+ distinct rhyme groups
+//   E. Polysyllabic word count — deliberate diction signal
+
+const STOP_WORDS = new Set([
+  'the','and','for','but','not','you','with','this','that','from','they','have',
+  'was','are','been','will','what','when','who','how','out','all','one','can',
+  'had','her','him','his','she','our','your','its','like','just','into','than',
+  'then','more','also','some','such','even','each','both','very','only','does',
+]);
+
+export function analyzeStructuralLyricism(verse: string, lines: string[]): {
+  internalRhymePairs: number;    // A: within-line word-echo pairs (stop-filtered)
+  crossLineEchoClusters: number; // B: rhyme keys appearing 3+ times across verse
+  polysyllabicRhymePairs: number;// C: 3+ syllable words sharing a rhyme key
+  complexEchoLines: number;      // D: lines with 2+ distinct internal rhyme groups
+  polysyllabicWordCount: number; // E: total 3+ syllable words in verse
+} {
+  const allWords = verse.toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/).filter(Boolean);
+
+  // A: Internal rhyme pairs (within-line, stop-filtered, deduplicated)
+  let internalRhymePairs = 0;
+  for (const line of lines) {
+    const words = line.toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/)
+      .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+    const keys = words.map(w => rhymeKey(w));
+    for (let i = 0; i < keys.length; i++)
+      for (let j = i + 1; j < keys.length; j++)
+        if (keys[i].length >= 2 && keys[i] === keys[j])
+          internalRhymePairs++;
+  }
+
+  // B: Cross-line sound clusters (rhyme key appearing 3+ times anywhere in verse)
+  const allKeyFreq: Record<string, number> = {};
+  for (const line of lines) {
+    const words = line.toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/)
+      .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+    words.forEach(w => {
+      const k = rhymeKey(w);
+      if (k.length >= 2) allKeyFreq[k] = (allKeyFreq[k] ?? 0) + 1;
+    });
+  }
+  const crossLineEchoClusters = Object.values(allKeyFreq).filter(c => c >= 3).length;
+
+  // C: Polysyllabic rhyme pairs — words of 3+ syllables sharing a rhyme key
+  const polyWords = allWords.filter(w => syllableCount(w) >= 3);
+  const polyKeys = polyWords.map(w => rhymeKey(w));
+  let polysyllabicRhymePairs = 0;
+  for (let i = 0; i < polyKeys.length; i++)
+    for (let j = i + 1; j < polyKeys.length; j++)
+      if (polyKeys[i].length >= 2 && polyKeys[i] === polyKeys[j])
+        polysyllabicRhymePairs++;
+
+  // D: Complex echo lines — lines with 2+ distinct rhyme groups (≥2 words sharing a key)
+  let complexEchoLines = 0;
+  for (const line of lines) {
+    const words = line.toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/)
+      .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+    const groups: Record<string, number> = {};
+    words.forEach(w => {
+      const k = rhymeKey(w);
+      if (k.length >= 2) groups[k] = (groups[k] ?? 0) + 1;
+    });
+    if (Object.values(groups).filter(c => c >= 2).length >= 2) complexEchoLines++;
+  }
+
+  // E: Total polysyllabic words (3+ syllables)
+  const polysyllabicWordCount = polyWords.length;
+
+  return { internalRhymePairs, crossLineEchoClusters, polysyllabicRhymePairs, complexEchoLines, polysyllabicWordCount };
 }

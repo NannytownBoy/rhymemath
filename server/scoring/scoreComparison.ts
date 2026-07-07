@@ -29,6 +29,7 @@ import {
   countWordplayIndicators,
   analyzeStorytelling,
   detectPunchlines,
+  analyzeStructuralLyricism,
   clamp,
 } from "./textAnalysis";
 
@@ -348,15 +349,24 @@ function scoreRhyming(verse: string, measured: MeasuredMetrics): { score: number
   // End rhyme quality — bonus for consistent end rhymes across lines
   const endRhymeBonus = Math.min(12, endRhymes * 1.2);
 
+  // STRUCTURAL: polysyllabic rhyme pairs (presidents/represent, womb/tomb across lines)
+  // These are the hardest rhymes to execute and signal elite technical command
+  const structural = analyzeStructuralLyricism(verse, lines);
+  const polyRhymeBonus = Math.min(15, structural.polysyllabicRhymePairs * 6); // each pair = 6pts, max 15
+  // Within-line rhyme architecture bonus (already measured structurally)
+  const internalArchBonus = Math.min(12, structural.internalRhymePairs * 0.8);
+
   // Scale so true elite (100) requires exceptional across ALL dimensions
-  const raw = base + internalBonus + multiBonus + chainBonus + soundBonus + endRhymeBonus;
-  // Max possible ≈ 50+20+15+10+8+12 = 115 → scale to 95 ceiling. 100 requires perfection.
-  const score = clamp(Math.round((raw / 115) * 95 * 10) / 10);
+  const raw = base + internalBonus + multiBonus + chainBonus + soundBonus + endRhymeBonus + polyRhymeBonus + internalArchBonus;
+  // Max possible ≈ 50+20+15+10+8+12+15+12 = 142 → scale to 95 ceiling
+  const score = clamp(Math.round((raw / 142) * 95 * 10) / 10);
 
   const evidence = [
     `${endRhymes} end rhyme${endRhymes !== 1 ? "s" : ""} detected across ${lines.length} lines`,
     `~${internalRhymes} internal rhyme candidate${internalRhymes !== 1 ? "s" : ""}`,
     `${multiSyll} multisyllabic rhyme pattern${multiSyll !== 1 ? "s" : ""} detected`,
+    `Polysyllabic rhyme pairs: ${structural.polysyllabicRhymePairs} (3+ syllable words rhyming)`,
+    `Within-line rhyme pairs: ${structural.internalRhymePairs} (e.g. womb/tomb, wire/desire)`,
     `Longest rhyme chain: ${chainLen} consecutive line${chainLen !== 1 ? "s" : ""}`,
     `Estimated rhyme density: ${(rhymeDensity * 100).toFixed(1)}%`,
     `Repeated sound count: ${measured.repeatedSounds}`,
@@ -411,19 +421,38 @@ function scoreWordplay(verse: string): { score: number; evidence: string[] } {
   // "from X to Y" constructions, extended similes = dense packing of meaning
   const compressionScore = clamp(indicators.compressionScore * 7); // max ~28
 
-  // Weighted combine — calibrated so elite conceptual density (Nas, Rakim, Mos Def)
-  // lands in the 60-80 range while simpler wordplay lands in the 25-45 range
+  // --- Component 9 (STRUCTURAL): internal rhyme architecture ---
+  // Measures craft the keyword scanner can't see:
+  // - internalRhymePairs: words within the same line that rhyme (womb/tomb, wire/desire/conspire)
+  // - crossLineEchoClusters: same sound recurring 3+ times across the whole verse (intentional architecture)
+  // - complexEchoLines: single lines with 2+ distinct rhyme groups (double-cluster technique)
+  const structural = analyzeStructuralLyricism(verse, lines);
+  const internalRhymeScore = clamp(structural.internalRhymePairs * 3.0); // 16 pairs = 48pts — core Nas-style signal
+  const crossEchoScore = clamp(structural.crossLineEchoClusters * 5);    // 6 clusters = 30pts
+  const complexLineScore = clamp(structural.complexEchoLines * 8);        // each complex line = 8pts
+  // Polysyllabic end-rhyme chain: JID/Kendrick-style technical end-rhyme complexity
+  // "rhyme well/swell/excel/defy hell/die well", "focus/psychosis/corpus/Rigamortis"
+  // These are wordplay achievements even though they're end rhymes, not internal
+  const polyEndRhymeScore = clamp(structural.polysyllabicRhymePairs * 4); // 15 pairs = 60pts
+
+  // Weighted combine — structural signals anchor the score for technically elite verses
+  // Calibrated: Verbal Intercourse (conceptDensity=15, internalRhyme=16) → WP≈71
+  //             Rigamortus (polyEndRhyme=15, crossEcho=8, compression=6) → WP≈58
   const raw =
-    rhetoricalBase * 0.10 +
-    varietyBonus +
-    assonanceScore * 0.12 +
-    anaphora * 0.08 +
-    allitScore * 0.04 +
-    conceptScore * 0.28 +      // ← primary driver — non-linear for elite density
-    culturalScore * 0.12 +     // ← specificity
-    contrastScore * 0.12 +     // ← duality/contrast
-    compressionScore * 0.10 +  // ← compression
-    Math.min(15, indicators.total * 1.8);  // raw count bonus
+    rhetoricalBase * 0.04 +
+    varietyBonus * 0.60 +
+    assonanceScore * 0.05 +
+    anaphora * 0.04 +
+    allitScore * 0.02 +
+    conceptScore * 0.30 +          // conceptual density — Nas/Rakim dominant signal
+    culturalScore * 0.06 +         // named specificity
+    contrastScore * 0.05 +         // duality
+    compressionScore * 0.07 +      // ↑ compression — JID signal (6 hits)
+    internalRhymeScore * 0.26 +    // within-line rhyme architecture (Nas primary)
+    crossEchoScore * 0.14 +        // ↑ cross-verse sound design (JID has 8 clusters vs Verbal's 6)
+    complexLineScore * 0.04 +      // double-cluster lines
+    polyEndRhymeScore * 0.11 +     // ↑ polysyllabic end-rhyme chain (JID: 15 pairs = 60pts)
+    Math.min(25, indicators.total * 1.5);  // cap at 25 (Verbal=23 indicators)
 
   const score = clamp(Math.round(raw));
 
@@ -435,6 +464,9 @@ function scoreWordplay(verse: string): { score: number; evidence: string[] } {
     `Cultural specificity: ${indicators.culturalSpecificity} named reference${indicators.culturalSpecificity !== 1 ? "s" : ""} (places, people, institutions)`,
     `Contrast / juxtaposition: ${indicators.contrastScore} duality construct${indicators.contrastScore !== 1 ? "s" : ""} detected`,
     `Philosophical compression: ${indicators.compressionScore} dense construction${indicators.compressionScore !== 1 ? "s" : ""} detected`,
+    `Within-line rhyme pairs: ${structural.internalRhymePairs} (e.g. womb/tomb, wire/desire/conspire)`,
+    `Cross-verse sound clusters: ${structural.crossLineEchoClusters} distinct sounds recurring 3+ times`,
+    `Complex echo lines: ${structural.complexEchoLines} (lines with 2+ internal rhyme groups)`,
     `Assonance: ${assonanceScore.toFixed(1)}/20 · Anaphora: ${anaphora.toFixed(1)}/20 · Alliteration: ${allitScore.toFixed(1)}/12`,
     `Device variety: ${variety} of 4 rhetorical categories represented`,
   ];
@@ -457,25 +489,37 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
 
   // NEW: Scene detail — specific concrete nouns ground the verse in a real world
   // Nas: rikers, bus, weed, gun, beast, cycle. Each one paints a picture.
-  const sceneScore = clamp(Math.min(analysis.sceneDetail, 12) * 2.5); // max 30
+  const sceneScore = clamp(Math.min(analysis.sceneDetail, 14) * 3.5); // ↑ 12→14 cap, 2.5→3.5 multiplier
 
-  // NEW: Thematic anchoring — cycle/legacy/repeat = intentional thematic structure
-  const thematicScore = clamp(Math.min(analysis.thematicAnchoring, 6) * 3); // max 18
+  // NEW: Thematic anchoring — ritual/presume/legendary = intentional thematic structure
+  // Regex now captures Nas-style recurrence: ritual×2, womb/tomb, beast/yeast/east
+  const thematicScore = clamp(Math.min(analysis.thematicAnchoring, 10) * 3); // ↑ cap 6→10 (Verbal has 17 hits)
 
   // NEW: Character presence — other people exist = world is populated
   const characterScore = clamp(Math.min(analysis.characterPresence, 5) * 2); // max 10
 
-  // Weighted combine — scene detail and thematic anchoring are the big upgrades
-  // These are what made Nas's Verbal Intercourse score low before
+  // STRUCTURAL: polysyllabic word density as deliberate diction signal
+  // A rapper who chooses "nonchalant", "ritual", "unpredictable", "presidents"
+  // is operating at a different cognitive level — that IS storytelling craft.
+  const structural = analyzeStructuralLyricism(verse, lines);
+  const polyDictScore = clamp(Math.min(structural.polysyllabicWordCount, 15) * 3.0); // ↑ 2.0→3.0, max 45
+
+  // Cross-line sound architecture also signals intentional narrative construction:
+  // a verse where the same sounds echo across lines has been architecturally designed
+  const soundArchScore = clamp(structural.crossLineEchoClusters * 3); // ↓ 4→3 (less dominant in storytelling)
+
+  // Calibrated so Nas/Verbal Intercourse (scene=11, thematic=10+, polyDict=13) → Story≈60
   const raw =
-    transitionScore * 0.20 +
-    pronounScore * 0.10 +
-    emotionalScore * 0.10 +
-    lengthScore * 0.10 +
-    sceneScore * 0.25 +      // ← NEW: biggest weight, rewards Nas/Rakim/Big L style
-    thematicScore * 0.15 +   // ← NEW: rewards thematic depth
-    characterScore * 0.10 +  // ← NEW: rewards world-building
-    20;                      // base floor — no verse starts at 0
+    transitionScore * 0.07 +    // ↓ transitions less weight (many are filler "but/and")
+    pronounScore * 0.07 +
+    emotionalScore * 0.11 +     // ↑ emotional arc matters more
+    lengthScore * 0.05 +
+    sceneScore * 0.27 +         // ↑ concrete imagery is primary storytelling signal
+    thematicScore * 0.20 +      // ↑ thematic anchoring (now captures ritual/presume/legendary)
+    characterScore * 0.07 +     // world-building
+    polyDictScore * 0.12 +      // deliberate diction via polysyllabic words
+    soundArchScore * 0.05 +     // ↓ intentional sound architecture (smaller role here)
+    32;                         // ↑ base floor raised from 20 to 32
 
   const score = clamp(Math.round(raw));
 
@@ -486,6 +530,8 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
     `Scene detail: ${analysis.sceneDetail} concrete image${analysis.sceneDetail !== 1 ? "s" : ""} (places, objects, actions)`,
     `Thematic anchoring: ${analysis.thematicAnchoring} recurring theme marker${analysis.thematicAnchoring !== 1 ? "s" : ""}`,
     `Character presence: ${analysis.characterPresence} reference${analysis.characterPresence !== 1 ? "s" : ""} to other people/entities`,
+    `Deliberate diction: ${structural.polysyllabicWordCount} polysyllabic word${structural.polysyllabicWordCount !== 1 ? "s" : ""} (3+ syllables)`,
+    `Sound architecture: ${structural.crossLineEchoClusters} recurring sound cluster${structural.crossLineEchoClusters !== 1 ? "s" : ""} across verse`,
     `Verse length: ${analysis.lineCount} lines`,
   ];
 
@@ -497,37 +543,50 @@ function scorePunchlines(verse: string): { score: number; evidence: string[] } {
   const syllCounts = lineSyllableCounts(lines);
   const { count, density, setupPayoffPairs, contrastPunches, assertionPunches } = detectPunchlines(lines, syllCounts);
   const wordplay = countWordplayIndicators(verse);
+  const structural = analyzeStructuralLyricism(verse, lines);
 
   // Classic setup/payoff structure (long line → short punchy landing)
   const structureScore = clamp(setupPayoffPairs * 12);
-  // Line density (how many lines have punch characteristics)
-  const densityScore = clamp(density * 50);
   // Wordplay contribution — punchlines live and die by layered language
   const wordplayContrib = clamp(wordplay.total * 2.5);
-  // NEW: contrast punches — "but", "yet", "still", "nah" = pivot = reveal
+  // Contrast punches — "but", "yet", "still", "nah" = pivot = reveal
   const contrastBonus = clamp(Math.min(contrastPunches, 6) * 4);
-  // NEW: assertion punches — "I am", "I ain't", "that's real" = declarative power
+  // Assertion punches — "I am", "I ain't" = declarative power
   const assertionBonus = clamp(Math.min(assertionPunches, 5) * 3);
-  // NEW: conceptual density bonus — dense bars hit harder as punchlines
+  // Conceptual density — dense bars hit harder as punchlines
   const conceptBonus = clamp(Math.min(wordplay.conceptualDensity, 6) * 2);
 
+  // STRUCTURAL: within-line rhyme as punchline delivery mechanism
+  // "wire/desire/conspire", "womb/tomb", "beast/yeast/east" = the rhyme architecture
+  // IS the punchline in this style of lyricism. These lines land because of sound.
+  const soundPunchScore = clamp(structural.internalRhymePairs * 4.0);  // ↑ 3→4.0 per pair: 16 pairs = 64pts
+  // Cross-line echo as callback punchline: a sound that recurs = intentional payoff
+  const echoPayoffScore = clamp(structural.crossLineEchoClusters * 4); // 6 clusters = 24pts
+  // Polysyllabic rhyme pairs as the ultimate punchline tech
+  const polyPunchScore = clamp(structural.polysyllabicRhymePairs * 8); // each = 8pts
+
+  // Calibrated so Verbal Intercourse (16 internalRhymePairs, conceptDensity=15) → Punch≈69
+  // density capped at 0.7 so chorus-heavy verses don't inflate via repetition alone
   const score = clamp(
-    structureScore * 0.25 +
-    densityScore * 0.20 +
-    wordplayContrib * 0.20 +
-    contrastBonus * 0.15 +    // ← pivot lines that flip expectations
-    assertionBonus * 0.10 +   // ← declarative landing lines
-    conceptBonus * 0.10 +     // ← dense bars = harder hits
-    20                        // base floor
+    structureScore * 0.07 +
+    clamp(Math.min(density, 0.7) * 50) * 0.06 +  // ↓ density capped; less weight
+    wordplayContrib * 0.09 +
+    Math.min(contrastBonus, 16) * 0.04 +          // ↓ contrast capped at 4 punches * 4pts
+    assertionBonus * 0.04 +
+    conceptBonus * 0.12 +          // ↑ dense bars = dense punchlines
+    soundPunchScore * 0.28 +       // within-line rhyme-as-punchline (Nas-style)
+    echoPayoffScore * 0.11 +       // cross-line callback payoffs
+    polyPunchScore * 0.12 +        // ↑ polysyllabic end-rhyme pairs = hardest punch (JID: 15 pairs)
+    36                             // base floor
   );
 
   const evidence = [
     `~${setupPayoffPairs} setup/payoff structural pattern${setupPayoffPairs !== 1 ? "s" : ""} detected`,
     `Punch density: ${(density * 100).toFixed(0)}% of lines contain punchline structure`,
-    `Contrast/pivot lines: ${contrastPunches} (but/yet/still/nah constructions)`,
-    `Assertion punches: ${assertionPunches} declarative landing lines`,
-    `Wordplay contribution: ${wordplay.total} indicators`,
-    `Conceptual density bonus: ${wordplay.conceptualDensity} abstract concept hit${wordplay.conceptualDensity !== 1 ? "s" : ""}`,
+    `Within-line rhyme punches: ${structural.internalRhymePairs} (rhyme architecture as delivery)`,
+    `Cross-verse echo payoffs: ${structural.crossLineEchoClusters} recurring sounds (callback punchlines)`,
+    `Contrast/pivot lines: ${contrastPunches} | Assertion punches: ${assertionPunches}`,
+    `Conceptual density: ${wordplay.conceptualDensity} dense bars`,
     `Estimated punchline count: ~${count}`,
   ];
 
