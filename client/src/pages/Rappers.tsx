@@ -24,17 +24,23 @@ export default function Rappers() {
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
+  const isSearching = query.trim().length > 0;
+
   const { data: liveArtists, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/rappers/search/live", query],
+    queryKey: ["/api/rappers/search/live", query, isSearching],
     queryFn: async () => {
       try {
-        const res = await apiRequest("GET", `/api/rappers/search/live?q=${encodeURIComponent(query)}`);
+        const url = isSearching
+          ? `/api/rappers/search/live?q=${encodeURIComponent(query)}`
+          : `/api/rappers/search/live?trending=1`;
+        const res = await apiRequest("GET", url);
         return res.json();
       } catch {
         return [];
       }
     },
-    staleTime: 15000,
+    staleTime: isSearching ? 15000 : 60000,
+    refetchInterval: isSearching ? false : 5 * 60 * 1000, // refresh trending every 5 min
     retry: 1,
   });
 
@@ -55,7 +61,7 @@ export default function Rappers() {
 
         <div className="rm-section-header-blue" style={{ marginTop: "20px" }}>[ RAPPER DATABASE ]</div>
         <p style={{ fontFamily: "Georgia, serif", fontSize: "13px", color: "#555", marginBottom: "14px" }}>
-          Every artist analyzed or compared on RhymeMath. Click a name to see full stat breakdown. Stats update after each analysis.
+          Top 10 most analyzed in the last 24 hours. Search to find any artist in the database. Click a name for the full stat breakdown.
         </p>
 
         {/* Search */}
@@ -92,7 +98,10 @@ export default function Rappers() {
         {artists.length > 0 && (
           <div>
             <div className="rm-section-header" style={{ marginBottom: "0", background: "#006600", borderColor: "#004400" }}>
-              &#9679; LIVE ARTISTS ({artists.length}) — click a name to expand stats
+              {isSearching
+                ? <span>&#9679; SEARCH RESULTS ({artists.length}) &mdash; click a name to expand</span>
+                : <span>&#9679; TRENDING NOW &mdash; TOP 10 LAST 24 HRS</span>
+              }
             </div>
             <div className="rm-card" style={{ padding: 0 }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -120,6 +129,11 @@ export default function Rappers() {
                             <span style={{ fontFamily: "Arial Black, Arial, sans-serif", fontSize: "13px", color: "#1a3a7a" }}>
                               {a.name}
                             </span>
+                            {!isSearching && a.recentCount > 0 && (
+                              <span style={{ marginLeft: "6px", background: "#c0392b", color: "#fff", fontFamily: "Arial, sans-serif", fontSize: "9px", fontWeight: 700, padding: "1px 5px" }}>
+                                {a.recentCount} TODAY
+                              </span>
+                            )}
                             <span style={{ marginLeft: "6px", fontFamily: "Courier New, monospace", fontSize: "10px", color: "#888" }}>
                               {isExpanded ? "▲" : "▼"}
                             </span>

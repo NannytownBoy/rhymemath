@@ -497,8 +497,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/rappers/search/live", async (req, res) => {
     try {
       const query = ((req.query.q as string) ?? "").toLowerCase();
+      const trending = req.query.trending === "1"; // if true, return top 10 by 24h activity
       const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
       const toTitleCase = (s: string) => s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
       const BLOCKLIST = new Set([
         'test','asdf','aaa','xxx','zzz','foo','bar','baz','qwerty',
@@ -510,16 +513,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         name: string; slug: string;
         totalScore: number; flow: number; wordplay: number;
         storytelling: number; rhyming: number; punchlines: number;
-        count: number; battleCount: number; wins: number; losses: number;
+        count: number; recentCount: number; battleCount: number; wins: number; losses: number;
       }> = {};
 
-      const upsert = (name: string, scores: any, win: boolean | null) => {
+      const upsert = (name: string, scores: any, win: boolean | null, createdAt: number) => {
         if (!name?.trim()) return;
         const key = name.toLowerCase().trim();
         if (BLOCKLIST.has(key)) return;
         const slug = toSlug(name);
         if (!artistMap[slug]) {
-          artistMap[slug] = { name: toTitleCase(name), slug, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, battleCount: 0, wins: 0, losses: 0 };
+          artistMap[slug] = { name: toTitleCase(name), slug, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, recentCount: 0, battleCount: 0, wins: 0, losses: 0 };
         }
         const e = artistMap[slug];
         e.totalScore += scores?.overall ?? 0;
@@ -529,6 +532,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         e.rhyming += scores?.rhyming ?? 0;
         e.punchlines += scores?.punchlines ?? 0;
         e.count += 1;
+        if (createdAt >= oneDayAgo) e.recentCount += 1;
         if (win === true) { e.wins += 1; e.battleCount += 1; }
         else if (win === false) { e.losses += 1; e.battleCount += 1; }
       };
@@ -546,8 +550,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         try { result = JSON.parse((c as any).resultJson); } catch { continue; }
         const aWon = result?.winner === "A";
         const bWon = result?.winner === "B";
-        upsert(result?.artistA?.artistName ?? c.artistAName, result?.artistA?.scores, aWon);
-        upsert(result?.artistB?.artistName ?? c.artistBName, result?.artistB?.scores, bWon);
+        const ts = typeof c.createdAt === "number" ? c.createdAt : Date.parse(c.createdAt as any);
+        upsert(result?.artistA?.artistName ?? c.artistAName, result?.artistA?.scores, aWon, ts);
+        upsert(result?.artistB?.artistName ?? c.artistBName, result?.artistB?.scores, bWon, ts);
       }
 
       // -- Solo analyses --
@@ -555,7 +560,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (a.scoringMode && a.scoringMode !== "standard") continue;
         let result: any = null;
         try { result = JSON.parse((a as any).resultJson); } catch { continue; }
-        upsert(a.artistName, result?.scores, null);
+        const ts = typeof a.createdAt === "number" ? a.createdAt : Date.parse(a.createdAt as any);
+        upsert(a.artistName, result?.scores, null, ts);
       }
 
       let results = Object.values(artistMap)
@@ -564,22 +570,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           name: e.name,
           slug: e.slug,
           comparisons: e.count,
+          recentCount: e.recentCount,
           battleCount: e.battleCount,
           wins: e.wins,
           losses: e.losses,
           winRate: e.battleCount > 0 ? Math.round((e.wins / e.battleCount) * 100) : 0,
-          avgScore:       e.count > 0 ? Math.round((e.totalScore  / e.count) * 10) / 10 : 0,
-          avgFlow:        e.count > 0 ? Math.round((e.flow        / e.count) * 10) / 10 : 0,
-          avgWordplay:    e.count > 0 ? Math.round((e.wordplay    / e.count) * 10) / 10 : 0,
-          avgStorytelling:e.count > 0 ? Math.round((e.storytelling/ e.count) * 10) / 10 : 0,
-          avgRhyming:     e.count > 0 ? Math.round((e.rhyming     / e.count) * 10) / 10 : 0,
-          avgPunchlines:  e.count > 0 ? Math.round((e.punchlines  / e.count) * 10) / 10 : 0,
+          avgScore:        e.count > 0 ? Math.round((e.totalScore   / e.count) * 10) / 10 : 0,
+          avgFlow:         e.count > 0 ? Math.round((e.flow         / e.count) * 10) / 10 : 0,
+          avgWordplay:     e.count > 0 ? Math.round((e.wordplay     / e.count) * 10) / 10 : 0,
+          avgStorytelling: e.count > 0 ? Math.round((e.storytelling / e.count) * 10) / 10 : 0,
+          avgRhyming:      e.count > 0 ? Math.round((e.rhyming      / e.count) * 10) / 10 : 0,
+          avgPunchlines:   e.count > 0 ? Math.round((e.punchlines   / e.count) * 10) / 10 : 0,
         }));
 
-      if (query) results = results.filter(a => a.name.toLowerCase().includes(query));
-      results.sort((a, b) => b.avgScore - a.avgScore);
+      if (query) {
+        // Search mode: filter by name, return up to 50 sorted by avg score
+        results = results.filter(a => a.name.toLowerCase().includes(query));
+        results.sort((a, b) => b.avgScore - a.avgScore);
+        return res.json(results.slice(0, 50));
+      }
 
-      res.json(results.slice(0, 50)); // cap at 50 for perf
+      if (trending) {
+        // Trending mode: top 10 by 24h activity, fall back to all-time if <10 recent
+        const hasRecent = results.some(r => r.recentCount > 0);
+        if (hasRecent) {
+          results = results.filter(r => r.recentCount > 0);
+          results.sort((a, b) => b.recentCount - a.recentCount);
+        } else {
+          results.sort((a, b) => b.comparisons - a.comparisons);
+        }
+        return res.json(results.slice(0, 10));
+      }
+
+      // Default: sort by avg score, cap at 50
+      results.sort((a, b) => b.avgScore - a.avgScore);
+      res.json(results.slice(0, 50));
     } catch (err: any) {
       console.error("Live search error:", err?.message);
       res.status(500).json({ error: "Search failed." });
