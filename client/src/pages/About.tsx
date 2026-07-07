@@ -190,7 +190,7 @@ export default function About() {
                 },
                 {
                   range: "70 – 79",
-                  tier: "Silver",
+                  tier: "High Caliber",
                   color: "#4a7a9b",
                   meaning: "Strong verse with real technical merit. Likely excellent in 2–3 categories with no critical weak spots. The kind of verse that earns respect without necessarily being quoted forever.",
                 },
