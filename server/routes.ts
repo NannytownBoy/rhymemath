@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
+import { runIntegrityCheck } from "./integrity";
 
 // ── Scoring version — bump when formula changes significantly ─────────────────
 const SCORING_VERSION = "v2";
@@ -662,6 +663,55 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (err) {
       console.error("Live profile error:", err);
       res.status(500).json({ error: "Failed to build live profile." });
+    }
+  });
+
+  // ── Admin: on-demand integrity check ──────────────────────────────────────
+  app.post("/api/admin/integrity-check", async (_req, res) => {
+    try {
+      const report = await runIntegrityCheck();
+      console.log(`[integrity] Manual run: removed ${report.total_removed} bad rows.`);
+      res.json({ success: true, report });
+    } catch (err) {
+      console.error("[integrity] Manual check failed:", err);
+      res.status(500).json({ error: "Integrity check failed." });
+    }
+  });
+
+  // ── Admin: view current DB health (non-destructive) ───────────────────────
+  app.get("/api/admin/db-health", async (_req, res) => {
+    try {
+      const { db } = await import("./storage");
+      const { analyses, comparisons } = await import("@shared/schema");
+      const { sql, count } = await import("drizzle-orm");
+
+      const [analysisCount] = await db.select({ count: count() }).from(analyses).all
+        ? db.select({ count: count() }).from(analyses)
+        : [];
+
+      // Use raw SQL for complex health check
+      const { Pool } = await import("pg");
+      const p = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      });
+
+      const health = await p.query(`
+        SELECT
+          (SELECT COUNT(*) FROM analyses) AS total_analyses,
+          (SELECT COUNT(*) FROM analyses WHERE LENGTH(TRIM(verse)) < 20) AS short_verse_count,
+          (SELECT COUNT(*) FROM analyses WHERE verse ILIKE '[No verse provided%' OR verse ILIKE '(No verse%') AS placeholder_count,
+          (SELECT COUNT(*) FROM comparisons) AS total_comparisons,
+          (SELECT COUNT(DISTINCT LOWER(TRIM(artist_name))) FROM analyses) AS unique_artists,
+          (SELECT MAX(created_at) FROM analyses) AS last_analysis_at,
+          (SELECT MAX(created_at) FROM comparisons) AS last_comparison_at;
+      `);
+
+      await p.end();
+      res.json({ success: true, health: health.rows[0] });
+    } catch (err) {
+      console.error("[db-health] failed:", err);
+      res.status(500).json({ error: "DB health check failed." });
     }
   });
 

@@ -3,6 +3,7 @@ import express, { Response, NextFunction } from 'express';
 import type { Request } from 'express';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { startIntegrityScheduler } from "./integrity";
 import { createServer } from "node:http";
 import { Pool } from "pg";
 
@@ -186,9 +187,13 @@ async function ensureTables() {
              'lil wayne weezy', 'weezy f baby',
              'nas nasir', 'nasir jones nas'
            )
-           OR LOWER(TRIM(song_name))   IN ('test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty', 'untitled', 'unknown')
+           OR LOWER(TRIM(song_name)) IN ('test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty', 'untitled', 'unknown',
+             'new orl state of mind', 'new york state of mine', 'new york state of mind (misspelled)',
+             'ny state of mind', 'new york state')
            OR TRIM(artist_name) = ''
            OR TRIM(song_name)   = ''
+           OR verse LIKE '[No verse provided%'
+           OR LENGTH(TRIM(verse)) < 20
         RETURNING id
       ),
       del_comparisons AS (
@@ -312,6 +317,7 @@ app.use((req, res, next) => {
 (async () => {
   await ensureTables();
   await registerRoutes(httpServer, app);
+  startIntegrityScheduler();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
