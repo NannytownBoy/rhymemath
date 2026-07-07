@@ -263,6 +263,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json([]);
   });
 
+  // ── GET /api/artist-verses ─────────────────────────────────────────────────
+  // Returns all verses (battles + solos) for a given artist name
+  app.get("/api/artist-verses", async (req, res) => {
+    try {
+      const name = (req.query.name as string ?? "").trim();
+      if (!name) return res.status(400).json({ error: "Artist name required." });
+      const verses = await storage.getArtistVerses(name);
+      res.json(verses);
+    } catch (err) {
+      console.error("Artist verses error:", err);
+      res.status(500).json({ error: "Failed to load artist verses." });
+    }
+  });
+
   // ── GET /api/recent ───────────────────────────────────────────────────────
   app.get("/api/recent", async (req, res) => {
     const recent = await storage.getRecentComparisons(10);

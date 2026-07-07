@@ -30,6 +30,7 @@ export interface IStorage {
   getComparison(resultId: string): Promise<Comparison | undefined>;
   getRecentComparisons(limit: number): Promise<Comparison[]>;
   getDynamicLeaderboard(category: string, limit: number): Promise<any[]>;
+  getArtistVerses(artistName: string): Promise<any[]>;
 
   // Community users
   createUser(username: string): Promise<CommunityUser>;
@@ -137,10 +138,11 @@ export class DatabaseStorage implements IStorage {
     const artistMap: Record<string, {
       artistName: string;
       totalScore: number;
+      bestScore: number;   // track best individual score
       flow: number; wordplay: number; storytelling: number; rhyming: number; punchlines: number;
       count: number;        // all entries (battles + solos)
       battleCount: number;  // battles only
-      wins: number; losses: number;
+      wins: number; losses: number; ties: number;
     }> = {};
 
     const LEADERBOARD_BLOCKLIST = new Set([
@@ -155,41 +157,108 @@ export class DatabaseStorage implements IStorage {
       'nas nasir', 'nasir jones nas',
     ]);
 
-    const upsert = (name: string, scores: any, win: boolean | null) => {
+    // Normalise name for deduplication across entries (e.g. "Kendrick Lamar" vs "kendrick lamar")
+    const normKey = (name: string) => name.toLowerCase().trim();
+
+    // win: true=win, false=loss, null=tie/solo
+    const upsert = (
+      name: string,
+      scoreOverall: number,
+      flow: number,
+      wordplay: number,
+      storytelling: number,
+      rhyming: number,
+      punchlines: number,
+      win: boolean | null,
+      isBattle: boolean,
+    ) => {
       if (!name || !name.trim()) return;
-      const key = name.toLowerCase().trim();
+      const key = normKey(name);
       if (LEADERBOARD_BLOCKLIST.has(key)) return;
       if (!artistMap[key]) {
-        artistMap[key] = { artistName: toTitleCase(name), totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, battleCount: 0, wins: 0, losses: 0 };
+        artistMap[key] = {
+          artistName: toTitleCase(name),
+          totalScore: 0, bestScore: 0,
+          flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0,
+          count: 0, battleCount: 0, wins: 0, losses: 0, ties: 0,
+        };
       }
       const e = artistMap[key];
-      e.totalScore += scores?.overall ?? 0;
-      e.flow += scores?.flow ?? 0;
-      e.wordplay += scores?.wordplay ?? 0;
-      e.storytelling += scores?.storytelling ?? 0;
-      e.rhyming += scores?.rhyming ?? 0;
-      e.punchlines += scores?.punchlines ?? 0;
+      e.totalScore += scoreOverall;
+      if (scoreOverall > e.bestScore) e.bestScore = scoreOverall;
+      e.flow += flow;
+      e.wordplay += wordplay;
+      e.storytelling += storytelling;
+      e.rhyming += rhyming;
+      e.punchlines += punchlines;
       e.count += 1;
-      if (win === true) { e.wins += 1; e.battleCount += 1; }
-      else if (win === false) { e.losses += 1; e.battleCount += 1; }
-      // null = solo analysis, no win/loss
+      if (isBattle) {
+        e.battleCount += 1;
+        if (win === true)  e.wins += 1;
+        else if (win === false) e.losses += 1;
+        else e.ties += 1;
+      }
     };
 
-    // -- Battle comparisons --
+    // -- Battle comparisons: use direct DB columns, not resultJson parsing --
     for (const c of standardComparisons) {
-      let result: any;
-      try { result = JSON.parse(c.resultJson); } catch { continue; }
-      const aWon = result.winner === "A";
-      const bWon = result.winner === "B";
-      upsert(result.artistA?.artistName, result.artistA?.scores, aWon);
-      upsert(result.artistB?.artistName, result.artistB?.scores, bWon);
+      // Scores come from resultJson (only for the category breakdown per side)
+      // But winner / names come from reliable DB columns
+      let resultA: any = null;
+      let resultB: any = null;
+      try {
+        const parsed = JSON.parse(c.resultJson);
+        resultA = parsed.artistA;
+        resultB = parsed.artistB;
+      } catch { /* fall through with null */ }
+
+      const aScores = resultA?.scores ?? null;
+      const bScores = resultB?.scores ?? null;
+
+      // Determine W/L from DB column (authoritative)
+      const aWon = c.winner === "A";
+      const bWon = c.winner === "B";
+      // TIE = both get win:null, isBattle:true so battleCount increments but no W/L
+      const aWinFlag = c.winner === "TIE" ? null : aWon ? true : false;
+      const bWinFlag = c.winner === "TIE" ? null : bWon ? true : false;
+
+      upsert(
+        c.artistAName,
+        aScores?.overall ?? c.scoreA,
+        aScores?.flow ?? 0,
+        aScores?.wordplay ?? 0,
+        aScores?.storytelling ?? 0,
+        aScores?.rhyming ?? 0,
+        aScores?.punchlines ?? 0,
+        aWinFlag,
+        true,
+      );
+      upsert(
+        c.artistBName,
+        bScores?.overall ?? c.scoreB,
+        bScores?.flow ?? 0,
+        bScores?.wordplay ?? 0,
+        bScores?.storytelling ?? 0,
+        bScores?.rhyming ?? 0,
+        bScores?.punchlines ?? 0,
+        bWinFlag,
+        true,
+      );
     }
 
-    // -- Solo analyses --
+    // -- Solo analyses: use stored score columns (no JSON parsing needed) --
     for (const a of standardAnalyses) {
-      let result: any;
-      try { result = JSON.parse(a.resultJson); } catch { continue; }
-      upsert(a.artistName, result.scores, null);
+      upsert(
+        a.artistName,
+        a.scoreOverall,
+        a.scoreFlow,
+        a.scoreWordplay,
+        a.scoreStorytelling,
+        a.scoreRhyming,
+        a.scorePunchlines,
+        null,
+        false,
+      );
     }
 
     const entries = Object.values(artistMap).filter(e => e.count > 0);
@@ -202,7 +271,7 @@ export class DatabaseStorage implements IStorage {
         case "rhyming":     return e.count > 0 ? e.rhyming / e.count : 0;
         case "punchlines":  return e.count > 0 ? e.punchlines / e.count : 0;
         case "mostCompared": return e.count;
-        case "winRate":     return e.count > 0 ? e.wins / e.count : 0;
+        case "winRate":     return e.battleCount > 0 ? e.wins / e.battleCount : 0;
         default:            return e.count > 0 ? e.totalScore / e.count : 0;
       }
     };
@@ -215,13 +284,82 @@ export class DatabaseStorage implements IStorage {
         artistName: e.artistName,
         slug: e.artistName.toLowerCase().replace(/\s+/g, "-"),
         score: Math.round(getSortScore(e) * 10) / 10,
+        avgScore: e.count > 0 ? Math.round((e.totalScore / e.count) * 10) / 10 : 0,
+        bestScore: Math.round(e.bestScore * 10) / 10,
         comparisons: e.count,
         wins: e.wins,
         losses: e.losses,
+        ties: e.ties,
         battleCount: e.battleCount,
         winRate: e.battleCount > 0 ? Math.round((e.wins / e.battleCount) * 100) : 0,
         category,
       }));
+  }
+
+  // Get all verses (both comparisons + analyses) for a given artist name (case-insensitive)
+  async getArtistVerses(artistName: string): Promise<any[]> {
+    const normName = artistName.toLowerCase().trim();
+    const [allComparisons, allAnalyses] = await Promise.all([
+      db.select().from(comparisons),
+      db.select().from(analyses),
+    ]);
+
+    const verses: any[] = [];
+
+    // From comparisons
+    for (const c of allComparisons) {
+      const isSideA = c.artistAName.toLowerCase().trim() === normName;
+      const isSideB = c.artistBName.toLowerCase().trim() === normName;
+      if (!isSideA && !isSideB) continue;
+
+      let scores: any = null;
+      try {
+        const parsed = JSON.parse(c.resultJson);
+        scores = isSideA ? parsed.artistA?.scores : parsed.artistB?.scores;
+      } catch { /* ignore */ }
+
+      const overall = isSideA ? c.scoreA : c.scoreB;
+      const oppName = isSideA ? c.artistBName : c.artistAName;
+      const myWinner = c.winner === "TIE" ? "TIE" : (isSideA && c.winner === "A") || (!isSideA && c.winner === "B") ? "W" : "L";
+
+      verses.push({
+        type: "battle",
+        resultId: c.resultId,
+        songName: isSideA ? c.songAName : c.songBName,
+        verseLabel: isSideA ? (c as any).verseLabelA || null : (c as any).verseLabelB || null,
+        overall: Math.round(overall * 10) / 10,
+        flow: Math.round((scores?.flow ?? 0) * 10) / 10,
+        wordplay: Math.round((scores?.wordplay ?? 0) * 10) / 10,
+        storytelling: Math.round((scores?.storytelling ?? 0) * 10) / 10,
+        rhyming: Math.round((scores?.rhyming ?? 0) * 10) / 10,
+        punchlines: Math.round((scores?.punchlines ?? 0) * 10) / 10,
+        opponent: oppName,
+        result: myWinner,
+        createdAt: c.createdAt,
+      });
+    }
+
+    // From solo analyses
+    for (const a of allAnalyses) {
+      if (a.artistName.toLowerCase().trim() !== normName) continue;
+      verses.push({
+        type: "solo",
+        resultId: a.resultId,
+        songName: a.songName,
+        verseLabel: a.verseLabel || null,
+        overall: Math.round(a.scoreOverall * 10) / 10,
+        flow: Math.round(a.scoreFlow * 10) / 10,
+        wordplay: Math.round(a.scoreWordplay * 10) / 10,
+        storytelling: Math.round(a.scoreStorytelling * 10) / 10,
+        rhyming: Math.round(a.scoreRhyming * 10) / 10,
+        punchlines: Math.round(a.scorePunchlines * 10) / 10,
+        opponent: null,
+        result: null,
+        createdAt: a.createdAt,
+      });
+    }
+
+    return verses.sort((a, b) => b.overall - a.overall);
   }
 
   // Community Users
