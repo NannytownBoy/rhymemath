@@ -238,9 +238,11 @@ function ArtistPopup({
 }
 
 export default function Leaderboard() {
+  const PAGE_SIZE = 25;
   const [category, setCategory] = useState<Category>("overall");
   const [sortBy, setSortBy] = useState<SortBy>("score");
   const [popupArtist, setPopupArtist] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const { data: entries, isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/leaderboard", category, sortBy],
@@ -257,6 +259,16 @@ export default function Leaderboard() {
   });
 
   const isEmpty = !isLoading && (!entries || entries.length === 0);
+
+  // Pagination
+  const totalEntries = entries?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
+  const pageStart = (page - 1) * PAGE_SIZE; // 0-indexed
+  const pageEnd = pageStart + PAGE_SIZE;
+  const pageEntries = entries?.slice(pageStart, pageEnd) ?? [];
+
+  // Re-rank entries for current page so #1 is global, not page-local
+  // (they are already globally ranked from the API — just display entry.rank as-is)
 
   return (
     <main style={{ background: "#f7f5f0", minHeight: "100vh", paddingBottom: "40px" }}>
@@ -285,7 +297,7 @@ export default function Leaderboard() {
                 <button
                   key={key}
                   data-testid={`button-lb-${key}`}
-                  onClick={() => setCategory(key)}
+                  onClick={() => { setCategory(key); setPage(1); }}
                   style={{
                     fontFamily: "Arial, sans-serif",
                     fontSize: "11px",
@@ -311,7 +323,7 @@ export default function Leaderboard() {
                 <button
                   key={key}
                   data-testid={`button-sort-${key}`}
-                  onClick={() => setSortBy(key)}
+                  onClick={() => { setSortBy(key); setPage(1); }}
                   style={{
                     fontFamily: "Courier New, monospace",
                     fontSize: "10px",
@@ -359,7 +371,7 @@ export default function Leaderboard() {
                 </tr>
               </thead>
               <tbody>
-                {entries!.map((entry: any, i: number) => (
+                {pageEntries.map((entry: any, i: number) => (
                   <tr
                     key={entry.artistName}
                     data-testid={`row-leaderboard-${i}`}
@@ -421,6 +433,77 @@ export default function Leaderboard() {
             </table>
           )}
         </div>
+
+        {/* Pagination bar */}
+        {totalPages > 1 && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: "4px", marginTop: "10px", flexWrap: "wrap",
+          }}>
+            {/* Prev */}
+            <button
+              onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={page === 1}
+              style={{
+                fontFamily: "Courier New, monospace", fontSize: "11px", fontWeight: 700,
+                padding: "4px 10px", cursor: page === 1 ? "not-allowed" : "pointer",
+                background: page === 1 ? "#e8e8e8" : "#1a3a7a", color: page === 1 ? "#aaa" : "#fff",
+                border: "1px solid #aaa",
+              }}
+            >
+              &larr; Prev
+            </button>
+
+            {/* Page number buttons — show up to 7 around current page */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                if (idx > 0 && (arr[idx - 1] as number) < p - 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === "..." ? (
+                  <span key={`ellipsis-${idx}`} style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: "#999", padding: "4px 4px" }}>…</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{
+                      fontFamily: "Courier New, monospace", fontSize: "11px", fontWeight: 700,
+                      padding: "4px 8px", cursor: "pointer", minWidth: "32px",
+                      background: page === item ? "#1a3a7a" : "#f0eeea",
+                      color: page === item ? "#fff" : "#333",
+                      border: page === item ? "1px solid #0d2655" : "1px solid #aaa",
+                    }}
+                  >
+                    {item}
+                  </button>
+                )
+              )
+            }
+
+            {/* Next */}
+            <button
+              onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={page === totalPages}
+              style={{
+                fontFamily: "Courier New, monospace", fontSize: "11px", fontWeight: 700,
+                padding: "4px 10px", cursor: page === totalPages ? "not-allowed" : "pointer",
+                background: page === totalPages ? "#e8e8e8" : "#1a3a7a",
+                color: page === totalPages ? "#aaa" : "#fff",
+                border: "1px solid #aaa",
+              }}
+            >
+              Next &rarr;
+            </button>
+
+            {/* Count label */}
+            <span style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#999", marginLeft: "8px" }}>
+              {pageStart + 1}–{Math.min(pageEnd, totalEntries)} of {totalEntries}
+            </span>
+          </div>
+        )}
 
         <p style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#999", marginTop: "8px" }}>
           * W-L = battle record only (-- means no head-to-head battles yet). Verses Input = total solo + battle analyses submitted. Click any artist to see full score breakdown.

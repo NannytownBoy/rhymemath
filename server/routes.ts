@@ -287,7 +287,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const sortBy = (req.query.sortBy as string) ?? "score"; // "score" | "winRate" | "comparisons"
 
     // Leaderboard ONLY uses standard scoring mode comparisons
-    const dynamic = await storage.getDynamicLeaderboard(category, 25);
+    const dynamic = await storage.getDynamicLeaderboard(category, 200);
 
     if (dynamic.length > 0) {
       // Apply secondary sort if requested
