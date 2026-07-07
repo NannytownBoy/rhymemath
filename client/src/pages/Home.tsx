@@ -393,7 +393,7 @@ export default function Home() {
               </div>
               <div>
                 <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
-                  Verse Text <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span>
+                  Verse Text <span style={{ color: "#cc0000" }}>*</span>
                 </label>
                 <textarea data-testid="input-verse-a" className="rm-input"
                   style={{ width: "100%", height: "150px", resize: "vertical", lineHeight: "1.6" }}
@@ -465,7 +465,7 @@ export default function Home() {
                 </div>
                 <div>
                   <label className="rm-label" style={{ display: "block", marginBottom: "2px" }}>
-                    Verse Text <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span>
+                    Verse Text <span style={{ color: "#cc0000" }}>*</span>
                   </label>
                   <textarea data-testid="input-verse-b" className="rm-input"
                     style={{ width: "100%", height: "150px", resize: "vertical", lineHeight: "1.6" }}

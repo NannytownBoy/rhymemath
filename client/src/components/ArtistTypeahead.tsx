@@ -69,9 +69,8 @@ export default function ArtistTypeahead({ value, onChange, onSelectVerse, placeh
   }, []);
 
   const handlePickArtist = (r: VerseSearchResult) => {
+    // Only fill the artist name — let the user pick the song themselves
     onChange(r.artistName);
-    // If they pick an artist, also offer their most recent verse
-    onSelectVerse(r);
     setOpen(false);
     setHoveredIdx(-1);
   };

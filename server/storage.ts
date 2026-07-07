@@ -130,11 +130,17 @@ export class DatabaseStorage implements IStorage {
     const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard");
     const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard");
 
+    // Title-case helper for display names
+    const toTitleCase = (s: string) =>
+      s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
     const artistMap: Record<string, {
       artistName: string;
       totalScore: number;
       flow: number; wordplay: number; storytelling: number; rhyming: number; punchlines: number;
-      count: number; wins: number; losses: number;
+      count: number;        // all entries (battles + solos)
+      battleCount: number;  // battles only
+      wins: number; losses: number;
     }> = {};
 
     const LEADERBOARD_BLOCKLIST = new Set([
@@ -154,7 +160,7 @@ export class DatabaseStorage implements IStorage {
       const key = name.toLowerCase().trim();
       if (LEADERBOARD_BLOCKLIST.has(key)) return;
       if (!artistMap[key]) {
-        artistMap[key] = { artistName: name, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, wins: 0, losses: 0 };
+        artistMap[key] = { artistName: toTitleCase(name), totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, battleCount: 0, wins: 0, losses: 0 };
       }
       const e = artistMap[key];
       e.totalScore += scores?.overall ?? 0;
@@ -164,8 +170,8 @@ export class DatabaseStorage implements IStorage {
       e.rhyming += scores?.rhyming ?? 0;
       e.punchlines += scores?.punchlines ?? 0;
       e.count += 1;
-      if (win === true) e.wins += 1;
-      else if (win === false) e.losses += 1;
+      if (win === true) { e.wins += 1; e.battleCount += 1; }
+      else if (win === false) { e.losses += 1; e.battleCount += 1; }
       // null = solo analysis, no win/loss
     };
 
@@ -212,7 +218,8 @@ export class DatabaseStorage implements IStorage {
         comparisons: e.count,
         wins: e.wins,
         losses: e.losses,
-        winRate: e.count > 0 ? Math.round((e.wins / e.count) * 100) : 0,
+        battleCount: e.battleCount,
+        winRate: e.battleCount > 0 ? Math.round((e.wins / e.battleCount) * 100) : 0,
         category,
       }));
   }

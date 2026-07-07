@@ -145,9 +145,7 @@ export default function Leaderboard() {
                   <th style={{ padding: "6px 10px", textAlign: "left", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>#</th>
                   <th style={{ padding: "6px 10px", textAlign: "left", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Artist</th>
                   <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold", textTransform: "uppercase" }}>{getScoreLabel(category)}</th>
-                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>W</th>
-                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>L</th>
-                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Win %</th>
+                  <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>W-L</th>
                   <th style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#aaccff", fontWeight: "bold" }}>Bouts</th>
                 </tr>
               </thead>
@@ -173,14 +171,10 @@ export default function Leaderboard() {
                         ? entry.comparisons
                         : entry.score.toFixed(1)}
                     </td>
-                    <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#006600", fontWeight: 700 }}>
-                      {entry.wins}
-                    </td>
-                    <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#8b0000", fontWeight: 700 }}>
-                      {entry.losses}
-                    </td>
-                    <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#333" }}>
-                      {entry.winRate}%
+                    <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", fontWeight: 700 }}>
+                      {entry.battleCount > 0
+                        ? <span><span style={{ color: "#006600" }}>{entry.wins}</span><span style={{ color: "#555" }}>-</span><span style={{ color: "#8b0000" }}>{entry.losses}</span></span>
+                        : <span style={{ color: "#aaa", fontWeight: 400 }}>--</span>}
                     </td>
                     <td style={{ padding: "6px 10px", textAlign: "center", fontFamily: "Courier New, monospace", fontSize: "12px", color: "#666" }}>
                       {entry.comparisons}

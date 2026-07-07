@@ -141,6 +141,25 @@ async function ensureTables() {
     if (Number(analyses_removed) > 0 || Number(comparisons_removed) > 0) {
       console.log(`[startup] Cleaned up bad rows: ${analyses_removed} analyses, ${comparisons_removed} comparisons removed.`);
     }
+
+    // Deduplicate: for same artist+song, keep only the highest scoring entry
+    const deduped = await pool.query(`
+      DELETE FROM analyses
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            ROW_NUMBER() OVER (
+              PARTITION BY LOWER(TRIM(artist_name)), LOWER(TRIM(song_name))
+              ORDER BY score_overall DESC, created_at DESC
+            ) AS rn
+          FROM analyses
+        ) ranked
+        WHERE rn > 1
+      );
+    `);
+    if (deduped.rowCount && deduped.rowCount > 0) {
+      console.log(`[startup] Removed ${deduped.rowCount} lower-rated duplicate song entries.`);
+    }
   } catch (err) {
     console.error("[startup] Table creation error:", err);
   } finally {
