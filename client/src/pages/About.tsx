@@ -172,7 +172,6 @@ export default function About() {
                 <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb", width: "110px" }}>RANGE</th>
                 <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb", width: "140px" }}>TIER</th>
                 <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>WHAT IT MEANS</th>
-                <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>REFERENCE VERSES</th>
               </tr>
             </thead>
             <tbody>
@@ -181,50 +180,43 @@ export default function About() {
                   range: "90 – 100",
                   tier: "All-Time Elite",
                   color: "#b8860b",
-                  meaning: "Exceptional across every measurable dimension — rhyme architecture, wordplay density, narrative cohesion, and punchline precision all firing simultaneously.",
-                  refs: "Rakim \"I Know You Got Soul\", Biggie \"Kick in the Door\"",
+                  meaning: "Exceptional across every measurable dimension — rhyme architecture, wordplay density, narrative cohesion, and punchline precision all firing simultaneously. Every technical lever is maxed.",
                 },
                 {
                   range: "80 – 89",
                   tier: "Elite",
                   color: "#006600",
-                  meaning: "Dominant in most categories. One or two dimensions may not peak but the overall craft is undeniable. These are verses people still quote 20 years later.",
-                  refs: "Nas \"Verbal Intercourse\", Kendrick \"Rigamortus\"",
+                  meaning: "Dominant in most categories. Dense multi-syllabic rhyme schemes, layered wordplay, and structural control throughout. One or two dimensions may not peak, but the overall craft is undeniable. Verses that define careers.",
                 },
                 {
                   range: "70 – 79",
-                  tier: "High Caliber",
-                  color: "#1a5c1a",
-                  meaning: "Strong verse with real technical merit. Likely excellent in 2–3 categories. Respected in any era — could appear on a classic project.",
-                  refs: "Andre 3000 \"Art of Storytellin Pt. 1\", J. Cole \"Let Nas Down\"",
+                  tier: "Silver",
+                  color: "#4a7a9b",
+                  meaning: "Strong verse with real technical merit. Likely excellent in 2–3 categories with no critical weak spots. The kind of verse that earns respect without necessarily being quoted forever.",
                 },
                 {
                   range: "60 – 69",
                   tier: "Solid",
                   color: "#1a3a7a",
-                  meaning: "Above average. Competent in most areas with standout moments. Holds up in the track but may not be the most memorable verse on the album.",
-                  refs: "Most strong album cuts, reliable 16s",
+                  meaning: "Above average. Competent across most areas with standout moments in at least one dimension. Holds its own on any track but may not be the verse that defines it.",
                 },
                 {
                   range: "50 – 59",
                   tier: "Average",
                   color: "#664400",
-                  meaning: "Serviceable. The verse does its job. Limited complexity or a clear weakness in a key category (rhyme density, wordplay, or narrative arc). Filler territory.",
-                  refs: "Typical hook-heavy rap era cuts",
+                  meaning: "Serviceable. The verse does its job. Limited complexity or a clear weakness in a key category — rhyme density, wordplay, or narrative arc. Gets the song done but doesn't elevate it.",
                 },
                 {
                   range: "40 – 49",
                   tier: "Below Average",
                   color: "#8b0000",
-                  meaning: "Struggles in multiple dimensions. May rely heavily on delivery, beat, or personality to carry what the text alone doesn\u2019t support. Text-only scoring punishes this.",
-                  refs: "Party records, novelty verses, heavily ad-lib driven flows",
+                  meaning: "Struggles in multiple dimensions on the page. May rely on delivery, energy, or production to compensate for what the text alone doesn't carry. Text-only scoring reveals the gap.",
                 },
                 {
                   range: "Below 40",
                   tier: "Weak",
                   color: "#cc0000",
-                  meaning: "Minimal technical content detectable in text. Very short, repetitive, or structurally sparse. Note: delivery can make a low-scoring verse iconic \u2014 RhymeMath only reads the page.",
-                  refs: "Hook-only, mumble-era minimalism, punchline-only 8-bars",
+                  meaning: "Minimal technical content detectable in text. Very short, repetitive, or structurally sparse. Delivery can make a low-scoring verse feel iconic — RhymeMath only reads the page, not the room.",
                 },
               ].map((band, i) => (
                 <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f5f3ef" }}>
@@ -236,9 +228,6 @@ export default function About() {
                   </td>
                   <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Georgia, serif", fontSize: "11px", color: "#444", lineHeight: 1.5 }}>
                     {band.meaning}
-                  </td>
-                  <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Georgia, serif", fontSize: "10px", color: "#888", fontStyle: "italic" }}>
-                    {band.refs}
                   </td>
                 </tr>
               ))}
