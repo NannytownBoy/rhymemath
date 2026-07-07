@@ -2,6 +2,17 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+// Preserve known all-caps rapper names; Title-case everything else
+function toTitleCase(s: string): string {
+  if (!s) return s;
+  const PRESERVE_CAPS = new Set(['JID','DMX','AZ','UGK','RZA','GZA','NYC','DJ','MC','OG','MF','NWA','EPMD','LL','BIG','JAY']);
+  return s.trim().replace(/\w\S*/g, (word: string) => {
+    const upper = word.toUpperCase();
+    if (PRESERVE_CAPS.has(upper) || (word === upper && word.length >= 2 && word.length <= 5 && /^[A-Z]+$/.test(word))) return upper;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
 export interface VerseSearchResult {
   resultId: string;
   artistName: string;
@@ -83,6 +94,7 @@ export default function ArtistTypeahead({ value, onChange, onSelectVerse, placeh
         type="text"
         value={value}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onBlur={e => { if (e.target.value.trim()) onChange(toTitleCase(e.target.value)); }}
         onFocus={() => { if (shouldSearch) setOpen(true); }}
         placeholder={placeholder}
         data-testid={testId}

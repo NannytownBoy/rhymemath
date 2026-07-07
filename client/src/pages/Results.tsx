@@ -10,6 +10,114 @@ function copyShareLink() {
   navigator.clipboard.writeText(window.location.href).then(() => alert("Link copied!"));
 }
 
+// ── Solo Analysis Result View ──────────────────────────────────────────────────
+function SoloResultView({ result }: { result: any }) {
+  const { artistName, songName, verseLabel, scores, categories, explanation, scoringMode } = result;
+  const isCustom = scoringMode === "custom";
+  const catOrder = ["Flow", "Wordplay", "Storytelling", "Rhyming", "Punchlines"];
+
+  return (
+    <main style={{ background: "#f7f5f0", minHeight: "100vh", padding: "16px" }}>
+      <div style={{ maxWidth: "760px", margin: "0 auto" }}>
+
+        {/* Back link */}
+        <p style={{ marginBottom: "10px", fontFamily: "Arial, sans-serif", fontSize: "12px" }}>
+          <Link href="/"><a>&#8592; New Analysis</a></Link>
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          <a href="#" onClick={copyShareLink} style={{ color: "#006600" }}>&#128279; Share this breakdown</a>
+        </p>
+
+        {/* Header */}
+        <div className="rm-winner-box" style={{ marginBottom: "14px", textAlign: "center" }}>
+          <div className="rm-label" style={{ marginBottom: "4px" }}>SOLO ANALYSIS</div>
+          <div style={{ marginBottom: "6px" }}>
+            {isCustom ? (
+              <span style={{ display: "inline-block", background: "#8b0000", color: "#fff", fontFamily: "Courier New, monospace", fontSize: "10px", fontWeight: 700, padding: "2px 8px", textTransform: "uppercase" }}>&#9888; CUSTOM SCORING</span>
+            ) : (
+              <span style={{ display: "inline-block", background: "#006600", color: "#fff", fontFamily: "Courier New, monospace", fontSize: "10px", fontWeight: 700, padding: "2px 8px", textTransform: "uppercase" }}>&#10003; STANDARD SCORING &mdash; COUNTS TOWARD LEADERBOARD</span>
+            )}
+          </div>
+          <div style={{ fontFamily: "Arial Black, Arial, sans-serif", fontSize: "26px", color: "#006600", marginBottom: "2px" }}>
+            {artistName}
+          </div>
+          <div style={{ fontFamily: "Courier New, monospace", fontSize: "13px", color: "#333", marginBottom: "8px" }}>
+            {songName}{verseLabel ? ` — ${verseLabel}` : ""}
+          </div>
+          <div style={{ fontFamily: "Courier New, monospace", fontSize: "36px", fontWeight: 700, color: "#1a3a7a", lineHeight: 1 }}>
+            {scores.overall.toFixed(1)}
+          </div>
+          <div className="rm-label" style={{ color: "#666", marginBottom: "8px" }}>OVERALL SCORE</div>
+          {explanation && (
+            <p style={{ fontFamily: "Georgia, serif", fontSize: "12px", color: "#444", maxWidth: "560px", margin: "0 auto" }}>
+              {explanation}
+            </p>
+          )}
+        </div>
+
+        {/* Category Scores */}
+        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>Category Breakdown</div>
+        <div className="rm-card" style={{ padding: "12px", marginBottom: "12px" }}>
+          {catOrder.map(name => {
+            const cat = (categories ?? []).find((c: any) => c.name === name);
+            const score = cat?.scoreA ?? scores[name.toLowerCase()] ?? 0;
+            const barW = Math.min(100, Math.max(0, score));
+            const barColor = score >= 80 ? "#006600" : score >= 65 ? "#1a3a7a" : "#8b0000";
+            return (
+              <div key={name} style={{ marginBottom: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Courier New, monospace", fontSize: "11px", marginBottom: "3px" }}>
+                  <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{name}</span>
+                  <span style={{ fontWeight: 700, color: barColor }}>{score.toFixed(1)}</span>
+                </div>
+                <div style={{ height: "8px", background: "#e8e8e8", position: "relative", border: "1px solid #ccc" }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barW}%`, background: barColor, transition: "width 0.6s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Evidence per category */}
+        {(categories ?? []).length > 0 && (
+          <>
+            <div className="rm-section-header" style={{ marginBottom: "0" }}>Evidence &mdash; Category by Category</div>
+            <div className="rm-card" style={{ padding: "0", marginBottom: "12px" }}>
+              {(categories ?? []).map((cat: any, idx: number) => (
+                <details key={cat.name} style={{ borderBottom: idx < categories.length - 1 ? "1px solid #ddd" : "none" }}>
+                  <summary style={{
+                    padding: "8px 12px", cursor: "pointer",
+                    fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: 700,
+                    background: "#f5f3ef", listStyle: "none",
+                  }}>
+                    <span style={{ float: "right", fontFamily: "Courier New, monospace", color: cat.scoreA >= 80 ? "#006600" : cat.scoreA >= 65 ? "#1a3a7a" : "#8b0000" }}>
+                      {(cat.scoreA ?? 0).toFixed(1)}
+                    </span>
+                    {cat.name} <span style={{ fontWeight: 400, color: "#888", fontSize: "10px" }}>(click to expand)</span>
+                  </summary>
+                  <div style={{ padding: "8px 14px 10px", background: "#fff" }}>
+                    {(cat.evidenceA ?? cat.evidence ?? []).map((e: string, ei: number) => (
+                      <div key={ei} style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: "#444", marginBottom: "3px", paddingLeft: "10px", borderLeft: "2px solid #1a3a7a" }}>
+                        {e}
+                      </div>
+                    ))}
+                    {(cat.evidenceA ?? cat.evidence ?? []).length === 0 && (
+                      <div style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: "#999" }}>No evidence data for this category.</div>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Disclaimer */}
+        <div style={{ fontFamily: "Georgia, serif", fontSize: "11px", color: "#777", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+          <i>RhymeMath uses a deterministic heuristic engine — not a human judge. Scores are estimated from detected text patterns. Results are transparent, not definitive.</i>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function Results() {
   const { id } = useParams<{ id: string }>();
 
@@ -48,6 +156,12 @@ export default function Results() {
         </p>
       </main>
     );
+  }
+
+  // Solo analysis result — render a single-artist breakdown
+  const isSolo = !(result as any).artistA && !!(result as any).scores;
+  if (isSolo) {
+    return <SoloResultView result={result as any} />;
   }
 
   const { artistA, artistB, winner, winnerName, confidence, categories, explanation, whyTheyWon, scoringMode, customWeights } = result as any;

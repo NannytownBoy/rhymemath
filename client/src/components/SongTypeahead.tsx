@@ -3,6 +3,20 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { VerseSearchResult } from "./ArtistTypeahead";
 
+// Title-case a song name on blur (mirrors server-side toTitleCase)
+function toTitleCase(s: string): string {
+  if (!s) return s;
+  const MINORS = new Set(['a','an','the','and','but','or','for','nor','on','at','to','by','in','of','up','as','is','it','if']);
+  const PRESERVE_CAPS = new Set(['JID','DMX','AZ','UGK','RZA','GZA','NYC','DJ','MC','OG','MF','NWA','EPMD','LL']);
+  return s.trim().replace(/\w\S*/g, (word: string, offset: number) => {
+    const upper = word.toUpperCase();
+    if (PRESERVE_CAPS.has(upper) || (word === upper && word.length >= 2 && word.length <= 5 && /^[A-Z]+$/.test(word))) return upper;
+    const lower = word.toLowerCase();
+    if (offset === 0 || !MINORS.has(lower)) return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    return lower;
+  });
+}
+
 interface Props {
   value: string;
   onChange: (val: string) => void;
@@ -85,6 +99,7 @@ export default function SongTypeahead({ value, onChange, onSelectVerse, artistNa
         type="text"
         value={value}
         onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onBlur={e => { if (e.target.value.trim()) onChange(toTitleCase(e.target.value)); }}
         onFocus={handleFocus}
         placeholder={placeholder}
         data-testid={testId}

@@ -13,9 +13,15 @@ const SCORING_VERSION = "v3";
 function toTitleCase(s: string): string {
   if (!s) return s;
   const MINORS = new Set(['a','an','the','and','but','or','for','nor','on','at','to','by','in','of','up','as','is','it','if']);
+  // Known all-caps rapper names / acronyms that must NOT be lowercased
+  const PRESERVE_CAPS = new Set(['JID','DMX','AZ','BIG','UGK','TDE','NYC','LA','DJ','MC','OG','RZA','GZA','MF','MCA','BDP','KRS','NWA','EPMD','LL','JAY','WC']);
   return s.trim().replace(/\w\S*/g, (word, offset) => {
+    // Preserve known all-caps names and acronyms (2-5 all-uppercase letters)
+    const upper = word.toUpperCase();
+    if (PRESERVE_CAPS.has(upper) || (word === upper && word.length >= 2 && word.length <= 5 && /^[A-Z]+$/.test(word))) {
+      return upper; // keep fully uppercase
+    }
     const lower = word.toLowerCase();
-    // Always capitalize first and last word, and words not in minor list
     if (offset === 0 || !MINORS.has(lower)) {
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }
@@ -235,11 +241,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── GET /api/results/:id ──────────────────────────────────────────────────
+  // Checks both comparisons (battle) and analyses (solo) tables
   app.get("/api/results/:id", async (req, res) => {
     try {
-      const comparison = await storage.getComparison(req.params.id);
-      if (!comparison) return res.status(404).json({ error: "Result not found." });
-      res.json(JSON.parse(comparison.resultJson));
+      const id = req.params.id;
+      // Try battle comparison first
+      const comparison = await storage.getComparison(id);
+      if (comparison) {
+        return res.json({ type: "battle", ...JSON.parse(comparison.resultJson) });
+      }
+      // Fall back to solo analysis
+      const analysis = await storage.getAnalysis(id);
+      if (analysis) {
+        return res.json({ type: "solo", ...JSON.parse(analysis.resultJson) });
+      }
+      return res.status(404).json({ error: "Result not found." });
     } catch (err) {
       res.status(500).json({ error: "Failed to load result." });
     }
@@ -694,7 +710,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         wins,
         losses,
         ties,
-        totalComparisons: matchedComparisons.length,
+        totalComparisons: matchedComparisons.length + matchedAnalyses.length,
         totalVerses: n,
         winRate: matchedComparisons.length > 0 ? Math.round((wins / matchedComparisons.length) * 100) : 0,
         overallAverage: n > 0 ? Math.round((totalOverall / n) * 10) / 10 : 0,
