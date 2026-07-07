@@ -5,6 +5,7 @@ import VerseAnnotation from "../components/VerseAnnotation.js";
 import type { RhymeMathResult, CategoryScore } from "../lib/types.js";
 import { getCachedResult } from "../lib/resultCache.js";
 import { apiRequest } from "../lib/queryClient.js";
+import AnalysisComments from "../components/AnalysisComments.js";
 
 function copyShareLink() {
   navigator.clipboard.writeText(window.location.href).then(() => alert("Link copied!"));
@@ -109,8 +110,17 @@ function SoloResultView({ result }: { result: any }) {
           </>
         )}
 
+        {/* Community Comments */}
+        {result.resultId && (
+          <AnalysisComments
+            resultId={result.resultId}
+            resultType="solo"
+            resultLabel={`${artistName} — ${songName}${verseLabel ? ` (${verseLabel})` : ""} (${scores.overall.toFixed(1)})`}
+          />
+        )}
+
         {/* Disclaimer */}
-        <div style={{ fontFamily: "Georgia, serif", fontSize: "11px", color: "#777", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+        <div style={{ fontFamily: "Georgia, serif", fontSize: "11px", color: "#777", borderTop: "1px solid #ccc", paddingTop: "8px", marginTop: "16px" }}>
           <i>RhymeMath uses a deterministic heuristic engine — not a human judge. Scores are estimated from detected text patterns. Results are transparent, not definitive.</i>
         </div>
       </div>
@@ -383,8 +393,17 @@ export default function Results() {
           </div>
         )}
 
+        {/* Community Comments — battle result */}
+        {(result as any).resultId && (
+          <AnalysisComments
+            resultId={(result as any).resultId}
+            resultType="battle"
+            resultLabel={`${artistA.artistName} vs ${artistB.artistName} — ${artistA.songName} vs ${artistB.songName} (${artistA.scores.overall.toFixed(1)} – ${artistB.scores.overall.toFixed(1)})`}
+          />
+        )}
+
         {/* Disclaimer */}
-        <div style={{ fontFamily: "Georgia, serif", fontSize: "11px", color: "#777777", borderTop: "1px solid #cccccc", paddingTop: "8px" }}>
+        <div style={{ fontFamily: "Georgia, serif", fontSize: "11px", color: "#777777", borderTop: "1px solid #cccccc", paddingTop: "8px", marginTop: "16px" }}>
           <i>
             RhymeMath uses a deterministic heuristic engine — not a human judge. All scores are estimated based on
             detected text patterns (rhyme density, syllable approximation, wordplay indicators). Results are

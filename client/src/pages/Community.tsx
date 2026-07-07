@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 type ViewState = "list" | "thread" | "new-thread" | "register";
-type ThreadCategory = "all" | "general" | "artist" | "beef" | "goat";
+type ThreadCategory = "all" | "general" | "artist" | "beef" | "goat" | "analysis";
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: "General",
   artist: "Artist Discussion",
   beef: "Beef & Battles",
   goat: "GOAT Debates",
+  analysis: "Analysis Discussions",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -18,6 +19,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   artist: "#006600",
   beef: "#8b0000",
   goat: "#b8860b",
+  analysis: "#4a0080",
 };
 
 function timeAgo(ts: number) {
@@ -239,6 +241,7 @@ function ThreadList({ username, filterCategory, setFilterCategory, onOpenThread,
 
   const FILTER_TABS: { key: ThreadCategory; label: string }[] = [
     { key: "all", label: "All" },
+    { key: "analysis", label: "Analysis Discussions" },
     { key: "general", label: "General" },
     { key: "artist", label: "Artist" },
     { key: "beef", label: "Beef/Battles" },
@@ -317,6 +320,14 @@ function ThreadList({ username, filterCategory, setFilterCategory, onOpenThread,
                     <div style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#888", marginTop: "2px" }}>
                       by {t.authorUsername}
                       {t.artistTag && <span style={{ color: "#006600" }}> · #{t.artistTag}</span>}
+                      {t.resultId && t.resultLabel && (
+                        <span
+                          style={{ color: "#4a0080", marginLeft: "6px", textDecoration: "underline", cursor: "pointer" }}
+                          onClick={e => { e.stopPropagation(); window.location.hash = `/results/${t.resultId}`; }}
+                        >
+                          ▶ view analysis
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td style={{ padding: "8px 10px", textAlign: "center" }}>

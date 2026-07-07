@@ -172,6 +172,64 @@ async function ensureTables() {
     `);
     console.log("[startup] Column migrations applied.");
 
+    // ── Threads schema migrations ─────────────────────────────────────────────
+    await pool.query(`
+      DO $$ BEGIN
+        -- threads table may have been created with old schema (author_id INTEGER).
+        -- Drizzle expects author_username TEXT. Patch if needed.
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='author_id')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='author_username') THEN
+          ALTER TABLE threads ADD COLUMN author_username TEXT NOT NULL DEFAULT 'anonymous';
+        END IF;
+        -- threads: add category column if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='category') THEN
+          ALTER TABLE threads ADD COLUMN category TEXT NOT NULL DEFAULT 'general';
+        END IF;
+        -- threads: add artist_tag column if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='artist_tag') THEN
+          ALTER TABLE threads ADD COLUMN artist_tag TEXT;
+        END IF;
+        -- threads: add reply_count column if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='reply_count') THEN
+          ALTER TABLE threads ADD COLUMN reply_count INTEGER NOT NULL DEFAULT 0;
+        END IF;
+        -- threads: fix created_at type (old schema used TIMESTAMPTZ, Drizzle expects INTEGER/BIGINT)
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='threads' AND column_name='created_at' AND data_type='timestamp with time zone'
+        ) THEN
+          ALTER TABLE threads DROP COLUMN created_at;
+          ALTER TABLE threads ADD COLUMN created_at BIGINT NOT NULL DEFAULT 0;
+        END IF;
+        -- threads: add result_id for linking to analyses
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='result_id') THEN
+          ALTER TABLE threads ADD COLUMN result_id TEXT;
+        END IF;
+        -- threads: add result_type ("solo" | "battle")
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='result_type') THEN
+          ALTER TABLE threads ADD COLUMN result_type TEXT;
+        END IF;
+        -- threads: add result_label (denormalized display label)
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='threads' AND column_name='result_label') THEN
+          ALTER TABLE threads ADD COLUMN result_label TEXT;
+        END IF;
+        -- posts: patch author_id → author_username if needed
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='posts' AND column_name='author_id')
+          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='posts' AND column_name='author_username') THEN
+          ALTER TABLE posts ADD COLUMN author_username TEXT NOT NULL DEFAULT 'anonymous';
+        END IF;
+        -- posts: fix created_at type
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='posts' AND column_name='created_at' AND data_type='timestamp with time zone'
+        ) THEN
+          ALTER TABLE posts DROP COLUMN created_at;
+          ALTER TABLE posts ADD COLUMN created_at BIGINT NOT NULL DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+    console.log("[startup] Threads/posts schema migrations applied.");
+
     // Ongoing cleanup: remove test/dummy/typo entries on every boot
     const cleaned = await pool.query(`
       WITH del_analyses AS (

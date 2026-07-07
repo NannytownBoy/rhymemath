@@ -205,8 +205,11 @@ export const threads = pgTable("threads", {
   title: text("title").notNull(),
   body: text("body").notNull(),
   authorUsername: text("author_username").notNull(),
-  category: text("category").notNull().default("general"), // "general" | "artist" | "beef" | "goat"
+  category: text("category").notNull().default("general"), // "general" | "artist" | "beef" | "goat" | "analysis"
   artistTag: text("artist_tag"), // optional: artist slug this thread is about
+  resultId: text("result_id"),   // optional: links thread to a specific analysis/comparison
+  resultType: text("result_type"), // "solo" | "battle" | null
+  resultLabel: text("result_label"), // e.g. "Twinz — Verse 1 (42.7)" — denormalized for display
   replyCount: integer("reply_count").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });

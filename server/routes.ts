@@ -439,6 +439,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ── GET /api/rappers/search/live ──────────────────────────────────────────
   // Returns artists from BOTH analyses + comparisons with full category breakdowns
+    // ── GET /api/community/results/:resultId/comments ────────────────────────
+  app.get("/api/community/results/:resultId/comments", async (req, res) => {
+    try {
+      const allThreads = await storage.getThreads("analysis");
+      const linked = allThreads
+        .filter((t: any) => t.resultId === req.params.resultId)
+        .sort((a: any, b: any) => b.createdAt - a.createdAt);
+      res.json(linked.map((t: any) => ({
+        id: t.id,
+        body: t.body,
+        authorUsername: t.authorUsername,
+        replyCount: t.replyCount,
+        createdAt: t.createdAt,
+        resultLabel: t.resultLabel,
+      })));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load comments." });
+    }
+  });
+
+  // ── POST /api/community/results/:resultId/comments ────────────────────────
+  app.post("/api/community/results/:resultId/comments", async (req, res) => {
+    try {
+      const { body, authorUsername, resultType, resultLabel } = req.body;
+      const resultId = req.params.resultId;
+      if (!body?.trim() || !authorUsername?.trim()) {
+        return res.status(400).json({ error: "Comment and username required." });
+      }
+      const user = await storage.getUserByUsername(authorUsername.trim());
+      if (!user) return res.status(403).json({ error: "Register in the Community tab first to comment." });
+
+      const thread = await storage.createThread({
+        title: resultLabel ?? "Analysis Comment",
+        body: body.trim().slice(0, 3000),
+        authorUsername: authorUsername.trim(),
+        category: "analysis",
+        artistTag: null,
+        resultId,
+        resultType: resultType ?? null,
+        resultLabel: resultLabel ?? null,
+        createdAt: Date.now(),
+      } as any);
+      res.json(thread);
+    } catch (err) {
+      console.error("Comment post error:", err);
+      res.status(500).json({ error: "Failed to post comment." });
+    }
+  });
+
+  // ── GET /api/community/analysis-threads ──────────────────────────────────
+  app.get("/api/community/analysis-threads", async (req, res) => {
+    try {
+      const all = await storage.getThreads("analysis");
+      res.json(all.sort((a: any, b: any) => b.createdAt - a.createdAt).slice(0, 50));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load analysis threads." });
+    }
+  });
+
   app.get("/api/rappers/search/live", async (req, res) => {
     try {
       const query = ((req.query.q as string) ?? "").toLowerCase();
