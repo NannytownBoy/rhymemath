@@ -7,7 +7,7 @@ import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
 
 // ── Scoring version — bump when formula changes significantly ─────────────────
-const SCORING_VERSION = "v3";
+const SCORING_VERSION = "v4";
 
 // ── Title-case helper for artist names and song titles ────────────────────────
 function toTitleCase(s: string): string {
