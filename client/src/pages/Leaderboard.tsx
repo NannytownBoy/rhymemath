@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 
 type Category = "overall" | "flow" | "wordplay" | "storytelling" | "rhyming" | "punchlines" | "mostCompared" | "winRate";
-type SortBy = "score" | "winRate" | "comparisons";
+type SortBy = "score" | "winRate" | "comparisons" | "bestScore";
 
 const CATEGORIES: { key: Category; label: string }[] = [
   { key: "overall", label: "Overall" },
@@ -18,9 +18,10 @@ const CATEGORIES: { key: Category; label: string }[] = [
 ];
 
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
-  { key: "score", label: "By Score" },
-  { key: "winRate", label: "By Win %" },
-  { key: "comparisons", label: "By # Comparisons" },
+  { key: "score",       label: "Avg Score" },
+  { key: "bestScore",   label: "Best" },
+  { key: "comparisons", label: "Verses Input" },
+  { key: "winRate",     label: "W-L" },
 ];
 
 function getRankColor(rank: number) {

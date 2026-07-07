@@ -294,6 +294,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let sorted = [...dynamic];
       if (sortBy === "winRate") sorted.sort((a, b) => b.winRate - a.winRate);
       else if (sortBy === "comparisons") sorted.sort((a, b) => b.comparisons - a.comparisons);
+      else if (sortBy === "bestScore") sorted.sort((a, b) => (b.bestScore ?? 0) - (a.bestScore ?? 0));
       // re-rank after sort
       sorted = sorted.map((e, i) => ({ ...e, rank: i + 1 }));
       return res.json(sorted);
