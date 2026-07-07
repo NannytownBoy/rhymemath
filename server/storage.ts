@@ -137,9 +137,22 @@ export class DatabaseStorage implements IStorage {
       count: number; wins: number; losses: number;
     }> = {};
 
+    const LEADERBOARD_BLOCKLIST = new Set([
+      'test', 'asdf', 'aaa', 'xxx', 'zzz', 'foo', 'bar', 'baz', 'qwerty',
+      'kendrick lemar', 'kendrick lamar jr', 'kendrick lamaar', 'kendrick lamer',
+      'kendrick lemar lamar', 'kdot', 'k dot',
+      'drake aubrey', 'aubrey drake', 'drak',
+      'jay z', 'jayz', 'jay-z.',
+      'eminem slim', 'slim shady eminem',
+      'biggie smalls notorious', 'notorious big', 'biggy',
+      'lil wayne weezy', 'weezy f baby',
+      'nas nasir', 'nasir jones nas',
+    ]);
+
     const upsert = (name: string, scores: any, win: boolean | null) => {
-      if (!name) return;
+      if (!name || !name.trim()) return;
       const key = name.toLowerCase().trim();
+      if (LEADERBOARD_BLOCKLIST.has(key)) return;
       if (!artistMap[key]) {
         artistMap[key] = { artistName: name, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, wins: 0, losses: 0 };
       }
