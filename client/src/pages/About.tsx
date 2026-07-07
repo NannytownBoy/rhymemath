@@ -163,6 +163,92 @@ export default function About() {
           </div>
         </div>
 
+        {/* Score Ranking Bands */}
+        <div style={{ border: "1px solid #bbbbbb", background: "#fff", marginBottom: "12px" }}>
+          <div className="rm-section-header" style={{ margin: 0 }}>[ SCORE RANKING BANDS ]</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Courier New, monospace", fontSize: "12px" }}>
+            <thead>
+              <tr style={{ background: "#e0e8ff" }}>
+                <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb", width: "110px" }}>RANGE</th>
+                <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb", width: "140px" }}>TIER</th>
+                <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>WHAT IT MEANS</th>
+                <th style={{ padding: "6px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>REFERENCE VERSES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                {
+                  range: "90 – 100",
+                  tier: "All-Time Elite",
+                  color: "#b8860b",
+                  meaning: "Exceptional across every measurable dimension — rhyme architecture, wordplay density, narrative cohesion, and punchline precision all firing simultaneously.",
+                  refs: "Rakim \"I Know You Got Soul\", Biggie \"Kick in the Door\"",
+                },
+                {
+                  range: "80 – 89",
+                  tier: "Elite",
+                  color: "#006600",
+                  meaning: "Dominant in most categories. One or two dimensions may not peak but the overall craft is undeniable. These are verses people still quote 20 years later.",
+                  refs: "Nas \"Verbal Intercourse\", Kendrick \"Rigamortus\"",
+                },
+                {
+                  range: "70 – 79",
+                  tier: "High Caliber",
+                  color: "#1a5c1a",
+                  meaning: "Strong verse with real technical merit. Likely excellent in 2–3 categories. Respected in any era — could appear on a classic project.",
+                  refs: "Andre 3000 \"Art of Storytellin Pt. 1\", J. Cole \"Let Nas Down\"",
+                },
+                {
+                  range: "60 – 69",
+                  tier: "Solid",
+                  color: "#1a3a7a",
+                  meaning: "Above average. Competent in most areas with standout moments. Holds up in the track but may not be the most memorable verse on the album.",
+                  refs: "Most strong album cuts, reliable 16s",
+                },
+                {
+                  range: "50 – 59",
+                  tier: "Average",
+                  color: "#664400",
+                  meaning: "Serviceable. The verse does its job. Limited complexity or a clear weakness in a key category (rhyme density, wordplay, or narrative arc). Filler territory.",
+                  refs: "Typical hook-heavy rap era cuts",
+                },
+                {
+                  range: "40 – 49",
+                  tier: "Below Average",
+                  color: "#8b0000",
+                  meaning: "Struggles in multiple dimensions. May rely heavily on delivery, beat, or personality to carry what the text alone doesn\u2019t support. Text-only scoring punishes this.",
+                  refs: "Party records, novelty verses, heavily ad-lib driven flows",
+                },
+                {
+                  range: "Below 40",
+                  tier: "Weak",
+                  color: "#cc0000",
+                  meaning: "Minimal technical content detectable in text. Very short, repetitive, or structurally sparse. Note: delivery can make a low-scoring verse iconic \u2014 RhymeMath only reads the page.",
+                  refs: "Hook-only, mumble-era minimalism, punchline-only 8-bars",
+                },
+              ].map((band, i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f5f3ef" }}>
+                  <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontWeight: 700, color: band.color, fontSize: "13px" }}>
+                    {band.range}
+                  </td>
+                  <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontWeight: 700, color: band.color, textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.05em" }}>
+                    {band.tier}
+                  </td>
+                  <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Georgia, serif", fontSize: "11px", color: "#444", lineHeight: 1.5 }}>
+                    {band.meaning}
+                  </td>
+                  <td style={{ padding: "8px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Georgia, serif", fontSize: "10px", color: "#888", fontStyle: "italic" }}>
+                    {band.refs}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ padding: "8px 14px", borderTop: "1px solid #ddd", fontFamily: "Courier New, monospace", fontSize: "10px", color: "#888" }}>
+            * Scores reflect the written text only. Vocal delivery, production, cultural context, and influence are not scored — those live in the ear, not on the page.
+          </div>
+        </div>
+
         {/* Measured vs Judged side by side */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
           <div style={{ border: "1px solid #bbbbbb", background: "#fff" }}>
