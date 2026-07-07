@@ -370,22 +370,44 @@ function scoreWordplay(verse: string): { score: number; evidence: string[] } {
   const lines = getLines(verse);
   const lineCount = lines.length;
 
-  // Normalize to line count
+  // --- Component 1: simile/metaphor/doubles/callbacks (existing) ---
   const density = indicators.total / Math.max(1, lineCount);
-  let base = clamp(density * 20); // 1 device per line = 20pts base
-  // Bonus for variety of devices used
+  const rhetoricalBase = clamp(density * 18);
   const variety = [indicators.similes > 0, indicators.metaphors > 0, indicators.doublesCount > 0, indicators.callbacks > 0].filter(Boolean).length;
-  const varietyBonus = variety * 7;
+  const varietyBonus = variety * 6;
 
-  const score = clamp(base + varietyBonus + Math.min(20, indicators.total * 2));
+  // --- Component 2: assonance chains (cross-line vowel sound patterns) ---
+  // Dro style: flubber/rubber, rockable/irreplaceable/untraceable = assonance wordplay
+  const assonanceScore = internalAssonanceScore(lines); // 0-20
+
+  // --- Component 3: anaphora / phrase symmetry (parallel structures) ---
+  // Dro style: "still...", "more...", "I'm...I'm", "them...them" = intentional device
+  const anaphora = phraseSymmetryScore(lines); // 0-20
+
+  // --- Component 4: alliteration density ---
+  const allitWords = (verse.match(/\b([bcdfghjklmnpqrstvwxyz])\w*\s+\1\w*/gi) ?? []).length;
+  const allitScore = Math.min(allitWords * 4, 15);
+
+  // Weighted combine: rhetorical devices anchor it, sound devices add on top
+  const score = clamp(
+    rhetoricalBase * 0.40 +
+    varietyBonus +
+    assonanceScore * 0.30 +
+    anaphora * 0.20 +
+    allitScore * 0.10 +
+    Math.min(15, indicators.total * 2)
+  );
 
   const evidence = [
     `~${indicators.similes} simile/comparison indicator${indicators.similes !== 1 ? "s" : ""} detected`,
     `~${indicators.metaphors} metaphor structure${indicators.metaphors !== 1 ? "s" : ""} detected`,
     `~${indicators.doublesCount} double-meaning / layered language term${indicators.doublesCount !== 1 ? "s" : ""} detected`,
     `~${indicators.callbacks} callback / reference marker${indicators.callbacks !== 1 ? "s" : ""} detected`,
+    `Assonance chain score: ${assonanceScore.toFixed(1)}/20 (cross-line vowel patterns)`,
+    `Anaphora / phrase symmetry: ${anaphora.toFixed(1)}/20 (parallel structures)`,
+    `Alliteration density: ${allitScore.toFixed(1)}/15`,
     `Total wordplay indicators: ${indicators.total} across ${lineCount} lines`,
-    `Device variety: ${variety} of 4 categories represented`,
+    `Device variety: ${variety} of 4 rhetorical categories represented`,
   ];
 
   return { score, evidence };

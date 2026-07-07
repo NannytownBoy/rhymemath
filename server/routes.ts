@@ -493,60 +493,93 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── GET /api/rappers/search/live ──────────────────────────────────────────
-  // Returns all artists that appear in real comparison data, with full stats
+  // Returns artists from BOTH analyses + comparisons with full category breakdowns
   app.get("/api/rappers/search/live", async (req, res) => {
     try {
       const query = ((req.query.q as string) ?? "").toLowerCase();
       const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      const toTitleCase = (s: string) => s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 
-      // Pull all comparisons (standard only for stats integrity)
-      const allComparisons = await storage.getRecentComparisons(1000);
+      const BLOCKLIST = new Set([
+        'test','asdf','aaa','xxx','zzz','foo','bar','baz','qwerty',
+        'kendrick lemar','kendrick lamaar','kendrick lamer','kdot','k dot',
+        'drake aubrey','aubrey drake','drak','jay z','jayz',
+      ]);
 
       const artistMap: Record<string, {
         name: string; slug: string;
-        comparisons: number; wins: number; losses: number;
-        totalScore: number; scoreCount: number;
+        totalScore: number; flow: number; wordplay: number;
+        storytelling: number; rhyming: number; punchlines: number;
+        count: number; battleCount: number; wins: number; losses: number;
       }> = {};
 
+      const upsert = (name: string, scores: any, win: boolean | null) => {
+        if (!name?.trim()) return;
+        const key = name.toLowerCase().trim();
+        if (BLOCKLIST.has(key)) return;
+        const slug = toSlug(name);
+        if (!artistMap[slug]) {
+          artistMap[slug] = { name: toTitleCase(name), slug, totalScore: 0, flow: 0, wordplay: 0, storytelling: 0, rhyming: 0, punchlines: 0, count: 0, battleCount: 0, wins: 0, losses: 0 };
+        }
+        const e = artistMap[slug];
+        e.totalScore += scores?.overall ?? 0;
+        e.flow += scores?.flow ?? 0;
+        e.wordplay += scores?.wordplay ?? 0;
+        e.storytelling += scores?.storytelling ?? 0;
+        e.rhyming += scores?.rhyming ?? 0;
+        e.punchlines += scores?.punchlines ?? 0;
+        e.count += 1;
+        if (win === true) { e.wins += 1; e.battleCount += 1; }
+        else if (win === false) { e.losses += 1; e.battleCount += 1; }
+      };
+
+      // Pull comparisons + analyses in parallel
+      const [allComparisons, allAnalyses] = await Promise.all([
+        storage.getRecentComparisons(1000),
+        storage.getRecentAnalyses(1000),
+      ]);
+
+      // -- Battle comparisons --
       for (const c of allComparisons) {
-        // Parse result JSON for scores
+        if (c.scoringMode && c.scoringMode !== "standard") continue;
         let result: any = null;
-        try { result = JSON.parse((c as any).resultJson); } catch { /* skip */ }
-
-        const addArtist = (name: string, score: number, won: boolean) => {
-          const s = toSlug(name);
-          if (!artistMap[s]) {
-            artistMap[s] = { name, slug: s, comparisons: 0, wins: 0, losses: 0, totalScore: 0, scoreCount: 0 };
-          }
-          const e = artistMap[s];
-          e.comparisons++;
-          if (won) e.wins++; else e.losses++;
-          if (typeof score === "number" && !isNaN(score)) {
-            e.totalScore += score;
-            e.scoreCount++;
-          }
-        };
-
-        const scoreA = result?.artistA?.scores?.overall ?? c.scoreA ?? 0;
-        const scoreB = result?.artistB?.scores?.overall ?? c.scoreB ?? 0;
-        addArtist(c.artistAName, scoreA, c.winner === "A");
-        addArtist(c.artistBName, scoreB, c.winner === "B");
+        try { result = JSON.parse((c as any).resultJson); } catch { continue; }
+        const aWon = result?.winner === "A";
+        const bWon = result?.winner === "B";
+        upsert(result?.artistA?.artistName ?? c.artistAName, result?.artistA?.scores, aWon);
+        upsert(result?.artistB?.artistName ?? c.artistBName, result?.artistB?.scores, bWon);
       }
 
-      let results = Object.values(artistMap).map(e => ({
-        name: e.name,
-        slug: e.slug,
-        comparisons: e.comparisons,
-        wins: e.wins,
-        losses: e.losses,
-        avgScore: e.scoreCount > 0 ? Math.round((e.totalScore / e.scoreCount) * 10) / 10 : null,
-        winRate: e.comparisons > 0 ? Math.round((e.wins / e.comparisons) * 100) : 0,
-      }));
+      // -- Solo analyses --
+      for (const a of allAnalyses) {
+        if (a.scoringMode && a.scoringMode !== "standard") continue;
+        let result: any = null;
+        try { result = JSON.parse((a as any).resultJson); } catch { continue; }
+        upsert(a.artistName, result?.scores, null);
+      }
+
+      let results = Object.values(artistMap)
+        .filter(e => e.count > 0)
+        .map(e => ({
+          name: e.name,
+          slug: e.slug,
+          comparisons: e.count,
+          battleCount: e.battleCount,
+          wins: e.wins,
+          losses: e.losses,
+          winRate: e.battleCount > 0 ? Math.round((e.wins / e.battleCount) * 100) : 0,
+          avgScore:       e.count > 0 ? Math.round((e.totalScore  / e.count) * 10) / 10 : 0,
+          avgFlow:        e.count > 0 ? Math.round((e.flow        / e.count) * 10) / 10 : 0,
+          avgWordplay:    e.count > 0 ? Math.round((e.wordplay    / e.count) * 10) / 10 : 0,
+          avgStorytelling:e.count > 0 ? Math.round((e.storytelling/ e.count) * 10) / 10 : 0,
+          avgRhyming:     e.count > 0 ? Math.round((e.rhyming     / e.count) * 10) / 10 : 0,
+          avgPunchlines:  e.count > 0 ? Math.round((e.punchlines  / e.count) * 10) / 10 : 0,
+        }));
 
       if (query) results = results.filter(a => a.name.toLowerCase().includes(query));
-      results.sort((a, b) => b.comparisons - a.comparisons);
+      results.sort((a, b) => b.avgScore - a.avgScore);
 
-      res.json(results);
+      res.json(results.slice(0, 50)); // cap at 50 for perf
     } catch (err: any) {
       console.error("Live search error:", err?.message);
       res.status(500).json({ error: "Search failed." });
