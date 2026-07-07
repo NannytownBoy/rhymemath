@@ -370,43 +370,68 @@ function scoreWordplay(verse: string): { score: number; evidence: string[] } {
   const lines = getLines(verse);
   const lineCount = lines.length;
 
-  // --- Component 1: simile/metaphor/doubles/callbacks (existing) ---
+  // --- Component 1: simile/metaphor/doubles/callbacks (rhetorical foundation) ---
   const density = indicators.total / Math.max(1, lineCount);
-  const rhetoricalBase = clamp(density * 18);
-  const variety = [indicators.similes > 0, indicators.metaphors > 0, indicators.doublesCount > 0, indicators.callbacks > 0].filter(Boolean).length;
-  const varietyBonus = variety * 6;
+  const rhetoricalBase = clamp(density * 15);
+  const variety = [
+    indicators.similes > 0,
+    indicators.metaphors > 0,
+    indicators.doublesCount > 0,
+    indicators.callbacks > 0,
+  ].filter(Boolean).length;
+  const varietyBonus = variety * 5;
 
-  // --- Component 2: assonance chains (cross-line vowel sound patterns) ---
-  // Dro style: flubber/rubber, rockable/irreplaceable/untraceable = assonance wordplay
+  // --- Component 2: assonance chains (sound-level wordplay) ---
   const assonanceScore = internalAssonanceScore(lines); // 0-20
 
-  // --- Component 3: anaphora / phrase symmetry (parallel structures) ---
-  // Dro style: "still...", "more...", "I'm...I'm", "them...them" = intentional device
+  // --- Component 3: anaphora / phrase symmetry ---
   const anaphora = phraseSymmetryScore(lines); // 0-20
 
   // --- Component 4: alliteration density ---
   const allitWords = (verse.match(/\b([bcdfghjklmnpqrstvwxyz])\w*\s+\1\w*/gi) ?? []).length;
-  const allitScore = Math.min(allitWords * 4, 15);
+  const allitScore = Math.min(allitWords * 4, 12);
 
-  // Weighted combine: rhetorical devices anchor it, sound devices add on top
-  const score = clamp(
-    rhetoricalBase * 0.40 +
+  // --- Component 5 (NEW): conceptual density ---
+  // How many abstract/philosophical/dual-meaning concept words per line
+  // Nas: beast, yeast, savage, wisdom, imprisoned, ritual, presume = DENSE
+  const conceptScore = clamp(Math.min(indicators.conceptualDensity, 10) * 1.8); // max ~18
+
+  // --- Component 6 (NEW): cultural/geographic specificity ---
+  // Naming real places, real people = grounded worldplay, not generic
+  const culturalScore = clamp(Math.min(indicators.culturalSpecificity, 6) * 2.0); // max 12
+
+  // --- Component 7 (NEW): contrast / juxtaposition ---
+  // "womb to tomb", "beast rise like yeast" = contrast IS wordplay
+  const contrastScore = clamp(indicators.contrastScore * 8); // max ~16
+
+  // --- Component 8 (NEW): philosophical compression ---
+  // "from X to Y" constructions, extended similes = meaning packed tight
+  const compressionScore = clamp(indicators.compressionScore * 5); // max ~20
+
+  // Weighted combine — conceptual and cultural dimensions are the big upgrades
+  const raw =
+    rhetoricalBase * 0.15 +
     varietyBonus +
-    assonanceScore * 0.30 +
-    anaphora * 0.20 +
-    allitScore * 0.10 +
-    Math.min(15, indicators.total * 2)
-  );
+    assonanceScore * 0.15 +
+    anaphora * 0.10 +
+    allitScore * 0.05 +
+    conceptScore * 0.20 +      // ← NEW anchor for Nas/Rakim/Mos Def style
+    culturalScore * 0.10 +     // ← NEW rewards specificity
+    contrastScore * 0.15 +     // ← NEW rewards duality
+    compressionScore * 0.10 +  // ← NEW rewards compression
+    Math.min(12, indicators.total * 1.5);  // raw count bonus
+
+  const score = clamp(Math.round(raw));
 
   const evidence = [
     `~${indicators.similes} simile/comparison indicator${indicators.similes !== 1 ? "s" : ""} detected`,
     `~${indicators.metaphors} metaphor structure${indicators.metaphors !== 1 ? "s" : ""} detected`,
     `~${indicators.doublesCount} double-meaning / layered language term${indicators.doublesCount !== 1 ? "s" : ""} detected`,
-    `~${indicators.callbacks} callback / reference marker${indicators.callbacks !== 1 ? "s" : ""} detected`,
-    `Assonance chain score: ${assonanceScore.toFixed(1)}/20 (cross-line vowel patterns)`,
-    `Anaphora / phrase symmetry: ${anaphora.toFixed(1)}/20 (parallel structures)`,
-    `Alliteration density: ${allitScore.toFixed(1)}/15`,
-    `Total wordplay indicators: ${indicators.total} across ${lineCount} lines`,
+    `Conceptual density: ${indicators.conceptualDensity} abstract/philosophical concept word${indicators.conceptualDensity !== 1 ? "s" : ""} detected`,
+    `Cultural specificity: ${indicators.culturalSpecificity} named reference${indicators.culturalSpecificity !== 1 ? "s" : ""} (places, people, institutions)`,
+    `Contrast / juxtaposition: ${indicators.contrastScore} duality construct${indicators.contrastScore !== 1 ? "s" : ""} detected`,
+    `Philosophical compression: ${indicators.compressionScore} dense construction${indicators.compressionScore !== 1 ? "s" : ""} detected`,
+    `Assonance: ${assonanceScore.toFixed(1)}/20 · Anaphora: ${anaphora.toFixed(1)}/20 · Alliteration: ${allitScore.toFixed(1)}/12`,
     `Device variety: ${variety} of 4 rhetorical categories represented`,
   ];
 
@@ -417,22 +442,47 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   const lines = getLines(verse);
   const analysis = analyzeStorytelling(verse, lines);
 
-  // Transitions show progression
-  const transitionScore = clamp(analysis.transitions * 6);
-  // Pronoun consistency shows POV clarity
-  const pronounScore = clamp(analysis.pronounConsistency * 25);
-  // Emotional arc
-  const emotionalScore = clamp(analysis.emotionalArc * 4);
+  // Transitions show progression (narrative glue)
+  const transitionScore = clamp(analysis.transitions * 5);
+  // Pronoun consistency shows POV clarity (first person locked in = coherent)
+  const pronounScore = clamp(analysis.pronounConsistency * 20);
+  // Emotional arc — feeling words = emotional investment
+  const emotionalScore = clamp(analysis.emotionalArc * 3);
   // Verse length (longer verse = more room for story)
   const lengthScore = analysis.lineCount >= 12 ? 15 : analysis.lineCount >= 8 ? 10 : 5;
 
-  const score = clamp(transitionScore * 0.35 + pronounScore * 0.25 + emotionalScore * 0.25 + lengthScore * 0.15 + 30); // 30pt base floor
+  // NEW: Scene detail — specific concrete nouns ground the verse in a real world
+  // Nas: rikers, bus, weed, gun, beast, cycle. Each one paints a picture.
+  const sceneScore = clamp(Math.min(analysis.sceneDetail, 12) * 2.5); // max 30
+
+  // NEW: Thematic anchoring — cycle/legacy/repeat = intentional thematic structure
+  const thematicScore = clamp(Math.min(analysis.thematicAnchoring, 6) * 3); // max 18
+
+  // NEW: Character presence — other people exist = world is populated
+  const characterScore = clamp(Math.min(analysis.characterPresence, 5) * 2); // max 10
+
+  // Weighted combine — scene detail and thematic anchoring are the big upgrades
+  // These are what made Nas's Verbal Intercourse score low before
+  const raw =
+    transitionScore * 0.20 +
+    pronounScore * 0.10 +
+    emotionalScore * 0.10 +
+    lengthScore * 0.10 +
+    sceneScore * 0.25 +      // ← NEW: biggest weight, rewards Nas/Rakim/Big L style
+    thematicScore * 0.15 +   // ← NEW: rewards thematic depth
+    characterScore * 0.10 +  // ← NEW: rewards world-building
+    20;                      // base floor — no verse starts at 0
+
+  const score = clamp(Math.round(raw));
 
   const evidence = [
     `${analysis.transitions} narrative transition word${analysis.transitions !== 1 ? "s" : ""} detected`,
-    `Pronoun / POV consistency: ${(analysis.pronounConsistency * 100).toFixed(0)}% (estimated)`,
+    `Pronoun / POV consistency: ${(analysis.pronounConsistency * 100).toFixed(0)}%`,
     `${analysis.emotionalArc} emotional arc indicator${analysis.emotionalArc !== 1 ? "s" : ""} detected`,
-    `Verse length: ${analysis.lineCount} lines — ${analysis.lineCount >= 12 ? "extended story room" : analysis.lineCount >= 8 ? "standard story room" : "compact verse"}`,
+    `Scene detail: ${analysis.sceneDetail} concrete image${analysis.sceneDetail !== 1 ? "s" : ""} (places, objects, actions)`,
+    `Thematic anchoring: ${analysis.thematicAnchoring} recurring theme marker${analysis.thematicAnchoring !== 1 ? "s" : ""}`,
+    `Character presence: ${analysis.characterPresence} reference${analysis.characterPresence !== 1 ? "s" : ""} to other people/entities`,
+    `Verse length: ${analysis.lineCount} lines`,
   ];
 
   return { score, evidence };
@@ -441,22 +491,39 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
 function scorePunchlines(verse: string): { score: number; evidence: string[] } {
   const lines = getLines(verse);
   const syllCounts = lineSyllableCounts(lines);
-  const { count, density, setupPayoffPairs } = detectPunchlines(lines, syllCounts);
+  const { count, density, setupPayoffPairs, contrastPunches, assertionPunches } = detectPunchlines(lines, syllCounts);
   const wordplay = countWordplayIndicators(verse);
 
-  // Base from setup/payoff structure
-  const structureScore = clamp(setupPayoffPairs * 15);
-  // Density of punchy lines
-  const densityScore = clamp(density * 60);
-  // Wordplay contributes (punchlines often rely on wordplay)
-  const wordplayContrib = clamp(wordplay.total * 3);
+  // Classic setup/payoff structure (long line → short punchy landing)
+  const structureScore = clamp(setupPayoffPairs * 12);
+  // Line density (how many lines have punch characteristics)
+  const densityScore = clamp(density * 50);
+  // Wordplay contribution — punchlines live and die by layered language
+  const wordplayContrib = clamp(wordplay.total * 2.5);
+  // NEW: contrast punches — "but", "yet", "still", "nah" = pivot = reveal
+  const contrastBonus = clamp(Math.min(contrastPunches, 6) * 4);
+  // NEW: assertion punches — "I am", "I ain't", "that's real" = declarative power
+  const assertionBonus = clamp(Math.min(assertionPunches, 5) * 3);
+  // NEW: conceptual density bonus — dense bars hit harder as punchlines
+  const conceptBonus = clamp(Math.min(wordplay.conceptualDensity, 6) * 2);
 
-  const score = clamp(structureScore * 0.4 + densityScore * 0.35 + wordplayContrib * 0.25 + 25); // 25pt floor
+  const score = clamp(
+    structureScore * 0.25 +
+    densityScore * 0.20 +
+    wordplayContrib * 0.20 +
+    contrastBonus * 0.15 +    // ← pivot lines that flip expectations
+    assertionBonus * 0.10 +   // ← declarative landing lines
+    conceptBonus * 0.10 +     // ← dense bars = harder hits
+    20                        // base floor
+  );
 
   const evidence = [
     `~${setupPayoffPairs} setup/payoff structural pattern${setupPayoffPairs !== 1 ? "s" : ""} detected`,
     `Punch density: ${(density * 100).toFixed(0)}% of lines contain punchline structure`,
-    `Wordplay contribution: ${wordplay.total} indicators (punchlines often use layered language)`,
+    `Contrast/pivot lines: ${contrastPunches} (but/yet/still/nah constructions)`,
+    `Assertion punches: ${assertionPunches} declarative landing lines`,
+    `Wordplay contribution: ${wordplay.total} indicators`,
+    `Conceptual density bonus: ${wordplay.conceptualDensity} abstract concept hit${wordplay.conceptualDensity !== 1 ? "s" : ""}`,
     `Estimated punchline count: ~${count}`,
   ];
 

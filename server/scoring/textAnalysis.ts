@@ -293,66 +293,155 @@ const METAPHOR_PATTERNS = [/\b(is|are|am|was|were)\b.*\b(a|an|the)\b/gi];
 const DOUBLE_MEANING = [/\b(bang|grind|burn|drop|run|blow|move|heat|fire|ice|flow|wave|break|cut|kill|murder|body|bars|cage|trap|drill|wave)\b/gi];
 const CALLBACK_MARKERS = [/\b(again|back|return|revisit|remember|recall)\b/gi];
 
+// ── Conceptual density: abstract/philosophical compression ──────────────────
+// Words that signal layered meaning: duality, cycles, systems, existence
+const CONCEPTUAL_DENSITY = [
+  /\b(womb|tomb|cycle|beast|rise|yeast|seed|stampede|conquer|peace|savage|wisdom|system|imprisoned|ritual|presume|unpredictable|nonchalant|salute|prophet|legacy|prophecy|vessel|metaphysical|consciousness|paradigm|eternal|mortal|transcend|sovereign|divine|chaos|balance|struggle|liberation|oppression|revolution|evolution|illusion|reality|truth|spirit|soul|flesh|blood|fire|light|dark|shadow|mirror|mask|crown|throne|war|peace|love|death|life|time|fate|god|devil|heaven|hell|earth|world|universe|cosmos)\b/gi,
+];
+
+// ── Cultural / geographic specificity ────────────────────────────────────────
+// Naming real places, people, institutions = conceptual anchoring
+const CULTURAL_SPECIFICITY = [
+  /\b(riker|rikers|brooklyn|bronx|harlem|queens|compton|watts|inglewood|chicago|atlanta|detroit|new york|l\.a\.|dc|baltimore|philly|houston|new orleans|mississippi|prison|penitentiary|parole|probation|precinct|corner|block|project|housing|ghetto|hood|trap|streets|avenue|bodega|church|courthouse|jail|cell|yard|visit|commissary)\b/gi,
+  /\b(reagan|trump|obama|malcolm|martin|huey|assata|mumia|pac|biggie|jay-z|nas|kendrick|cole|drake|eminem|wu-tang|rakim|big pun|big l|slick rick|krs|mobb deep|gang starr|tribe called quest|boot camp|terror squad)\b/gi,
+];
+
+// ── Contrast / juxtaposition (powerful rhetorical device) ────────────────────
+const CONTRAST_PATTERNS = [
+  /\b(but|yet|while|though|although|however|still|instead|rather|despite|even though|on the other hand)\b.*\b(peace|war|love|hate|life|death|rich|poor|free|trapped|rise|fall|win|lose|real|fake|strong|weak)\b/gi,
+  /\b(womb to (the )?tomb|life (and|to) death|rise (and|to) fall|heaven (and|to) hell|day (and|to) night|black (and|to) white)\b/gi,
+];
+
+// ── Philosophical compression: dense meaning in few words ────────────────────
+// Lines that condense large ideas — "from the womb to the tomb, presume the unpredictable"
+const COMPRESSION_MARKERS = [
+  /\b(from .{3,20} to .{3,20})\b/gi,       // "from X to Y" constructions
+  /\b(\w+ to \w+, \w+)\b/gi,             // compressed triplets
+  /\b(the \w+ of \w+)\b/gi,              // "the beast of the street"
+  /\b(like a \w+ \w+ \w+)\b/gi,         // extended similes
+];
+
 export function countWordplayIndicators(verse: string): {
   similes: number;
   metaphors: number;
   doublesCount: number;
   callbacks: number;
+  conceptualDensity: number;
+  culturalSpecificity: number;
+  contrastScore: number;
+  compressionScore: number;
   total: number;
 } {
   let similes = 0, metaphors = 0, doublesCount = 0, callbacks = 0;
+  let conceptualDensity = 0, culturalSpecificity = 0, contrastScore = 0, compressionScore = 0;
+
   SIMILE_PATTERNS.forEach((p) => { const m = verse.match(p); similes += m ? m.length : 0; });
   METAPHOR_PATTERNS.forEach((p) => { const m = verse.match(p); metaphors += m ? m.length : 0; });
   DOUBLE_MEANING.forEach((p) => { const m = verse.match(p); doublesCount += m ? m.length : 0; });
   CALLBACK_MARKERS.forEach((p) => { const m = verse.match(p); callbacks += m ? m.length : 0; });
-  return { similes, metaphors, doublesCount, callbacks, total: similes + metaphors + doublesCount + callbacks };
+  CONCEPTUAL_DENSITY.forEach((p) => { const m = verse.match(p); conceptualDensity += m ? m.length : 0; });
+  CULTURAL_SPECIFICITY.forEach((p) => { const m = verse.match(p); culturalSpecificity += m ? m.length : 0; });
+  CONTRAST_PATTERNS.forEach((p) => { const m = verse.match(p); contrastScore += m ? m.length : 0; });
+  COMPRESSION_MARKERS.forEach((p) => { const m = verse.match(p); compressionScore += m ? m.length : 0; });
+
+  const total = similes + metaphors + doublesCount + callbacks +
+    Math.min(conceptualDensity, 8) +          // cap each so one dimension can't dominate
+    Math.min(culturalSpecificity, 5) +
+    Math.min(contrastScore * 2, 6) +
+    Math.min(compressionScore, 4);
+
+  return { similes, metaphors, doublesCount, callbacks, conceptualDensity, culturalSpecificity, contrastScore, compressionScore, total };
 }
 
 // ── Storytelling / Coherence ─────────────────────────────────────────────────
 
 const TRANSITION_WORDS = /\b(then|now|before|after|when|while|because|so|but|and|yet|still|meanwhile|finally|first|next|last|suddenly|since|as|though|although|until|unless)\b/gi;
 const PRONOUN_CONSISTENCY = /\b(i|me|my|mine|myself|we|our|us)\b/gi;
-const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak)\b/gi;
+const EMOTIONAL_WORDS = /\b(love|hate|feel|pain|joy|fear|anger|hope|dream|grieve|win|lose|fight|rise|fall|broken|healed|lost|found|strong|weak|cry|laugh|bleed|breathe|survive|thrive|suffer|triumph|endure|resist)\b/gi;
+
+// Concrete scene-setting: specific nouns that ground a story in reality
+const SCENE_SETTING = /\b(street|block|corner|car|gun|money|prison|jail|cell|court|judge|cops|police|bus|train|plane|house|apartment|room|bed|table|phone|night|morning|summer|winter|city|town|neighborhood|bodega|church|school|hospital|courthouse|project|building|alley|roof|door|window|floor|wall|kitchen|bathroom|bedroom|hallway|park|lot|ave|avenue|boulevard|highway|bridge|tunnel|river|ocean|sky|sun|moon|stars|rain|snow|fire|smoke|blood|tears|sweat|hands|eyes|face|voice|heart|mind|soul|body|arms|legs|feet)\b/gi;
+
+// Thematic anchoring: returning to a central idea = intentional structure  
+const THEMATIC_ANCHORS = /\b(cycle|circle|repeat|again|back|return|always|never|forever|still|same|different|change|remain|continue|persist|endure|survive|legacy|generation|inheritance|bloodline|history|memory|future|past|present)\b/gi;
+
+// Character presence: other people exist in the verse = scene is populated
+const CHARACTER_PRESENCE = /\b(they|them|he|she|her|him|his|her|their|my (son|daughter|mother|father|brother|sister|friend|partner|wife|husband|homie|man|woman|girl|boy|kid|child|baby|grandma|grandpa|uncle|aunt|cousin|enemy|opps|plug|boss|judge|cop|detective|lawyer|doctor|teacher|preacher|pastor|prophet|king|queen))\b/gi;
 
 export function analyzeStorytelling(verse: string, lines: string[]): {
   transitions: number;
   pronounConsistency: number;
   emotionalArc: number;
+  sceneDetail: number;
+  thematicAnchoring: number;
+  characterPresence: number;
   lineCount: number;
 } {
   const transitions = (verse.match(TRANSITION_WORDS) ?? []).length;
   const pronounMatches = (verse.match(PRONOUN_CONSISTENCY) ?? []).length;
   const emotionalMatches = (verse.match(EMOTIONAL_WORDS) ?? []).length;
+  const sceneDetail = (verse.match(SCENE_SETTING) ?? []).length;
+  const thematicAnchoring = (verse.match(THEMATIC_ANCHORS) ?? []).length;
+  const characterPresence = (verse.match(CHARACTER_PRESENCE) ?? []).length;
   return {
     transitions,
     pronounConsistency: Math.min(1, pronounMatches / Math.max(1, lines.length) * 2),
     emotionalArc: emotionalMatches,
+    sceneDetail,
+    thematicAnchoring,
+    characterPresence,
     lineCount: lines.length,
   };
 }
 
 // ── Punchline Detection ──────────────────────────────────────────────────────
 
-// Punchlines typically end in short, punchy words after a setup.
-// Heuristic: lines shorter than average after lines longer than average = setup/payoff
+// Punchlines: not just short lines after long ones. Also:
+// - Lines with strong contrast words (but, yet, though, still = pivot = reveal)
+// - Lines ending in a conceptually dense word (death, free, god, real, truth, lies)
+// - Lines with "I" + declarative verb (I am, I ain't, I will, I know) = assertion punch
+// - Double-meaning landing words (words that can be read two ways)
+
+const PUNCHLINE_CONTRAST = /\b(but|yet|though|still|instead|rather|however|except|unless|until|despite|nah|nope|never|always)\b/gi;
+const STRONG_LANDING_WORDS = /\b(god|real|truth|lies|free|trapped|dead|live|win|lose|king|queen|nothing|everything|forever|never|again|alone|together|same|different|now|then|here|gone|rise|fall|peace|war|love|hate|soul|flesh|blood|fire|light|dark|done|still|yet|too|though|right|wrong|last|first|only|always|never)\b\W*$/gim;
+const ASSERTION_PUNCH = /\b(i am|i ain'?t|i'?m not|i will|i won'?t|i know|i don'?t|i never|i always|i been|i was|i did|i didn'?t|that'?s|this is|it'?s|they (can'?t|won'?t|don'?t|ain'?t)|we (are|ain'?t|don'?t))\b/gi;
+
 export function detectPunchlines(lines: string[], syllCounts: number[]): {
   count: number;
   density: number;
   setupPayoffPairs: number;
+  contrastPunches: number;
+  assertionPunches: number;
 } {
+  const verse = lines.join("\n");
   const avg = mean(syllCounts);
   let setups = 0, payoffs = 0, setupPayoffPairs = 0;
+
   for (let i = 1; i < lines.length; i++) {
     const prev = syllCounts[i - 1];
     const curr = syllCounts[i];
-    if (prev > avg * 1.1 && curr < avg * 0.9) {
-      setupPayoffPairs++;
-    }
+    // Classic setup/payoff: long line then short line
+    if (prev > avg * 1.1 && curr < avg * 0.9) setupPayoffPairs++;
     if (curr > avg * 1.1) setups++;
     if (curr < avg * 0.85) payoffs++;
   }
-  const density = (setups + payoffs) / Math.max(1, lines.length);
-  return { count: Math.floor((setupPayoffPairs + payoffs) / 2), density, setupPayoffPairs };
+
+  // NEW: contrast punches — pivot lines that flip the expectation
+  const contrastPunches = (verse.match(PUNCHLINE_CONTRAST) ?? []).length;
+  // NEW: assertion punches — declarative "I am / I ain't" landing lines
+  const assertionPunches = (verse.match(ASSERTION_PUNCH) ?? []).length;
+  // NEW: strong landing words at end of lines
+  const strongLandings = (verse.match(STRONG_LANDING_WORDS) ?? []).length;
+
+  const density = (setups + payoffs + contrastPunches) / Math.max(1, lines.length);
+
+  return {
+    count: Math.floor((setupPayoffPairs + payoffs + Math.min(contrastPunches, 4) + strongLandings) / 2),
+    density,
+    setupPayoffPairs,
+    contrastPunches,
+    assertionPunches,
+  };
 }
 
 // ── Normalize to 0–100 ───────────────────────────────────────────────────────
