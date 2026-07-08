@@ -135,9 +135,9 @@ export default function SoloResults() {
           {[
             { label: "Flow (30%)", value: scores.flow },
             { label: "Wordplay (20%)", value: scores.wordplay },
-            { label: "Storytelling (20%)", value: scores.storytelling },
-            { label: "Rhyming (15%)", value: scores.rhyming },
-            { label: "Punchlines (15%)", value: scores.punchlines },
+            { label: "Storytelling (16%)", value: scores.storytelling },
+            { label: "Rhyme Craft (22%)", value: scores.rhyming },
+            { label: "Punchlines (12%)", value: scores.punchlines },
           ].map(({ label, value }) => (
             <div key={label} style={{ marginBottom: "10px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>

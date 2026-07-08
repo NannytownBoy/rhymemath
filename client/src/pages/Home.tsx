@@ -208,14 +208,14 @@ export default function Home() {
             <p style={{ fontFamily: "Georgia, serif", fontSize: "12px", color: "#555555", margin: 0 }}>
               <strong style={{ fontFamily: "Arial Black, sans-serif", color: "#1a3a7a" }}>Solo Analysis</strong> — paste one verse. Get a full breakdown: flow, rhyme density, wordplay, and annotation.{" "}
               <span style={{ fontFamily: "Courier New, monospace", color: "#888888", fontSize: "11px" }}>
-                [Standard: Flow 30% &bull; Wordplay 20% &bull; Storytelling 20% &bull; Rhyming 15% &bull; Punchlines 15%]
+                [Standard: Flow 30% &bull; Rhyme Craft 22% &bull; Wordplay 20% &bull; Storytelling 16% &bull; Punchlines 12%]
               </span>
             </p>
           ) : (
             <p style={{ fontFamily: "Georgia, serif", fontSize: "12px", color: "#555555", margin: 0 }}>
               <strong style={{ fontFamily: "Arial Black, sans-serif", color: "#8b0000" }}>Battle Mode</strong> — enter two verses head to head. RhymeMath scores both and declares a winner.{" "}
               <span style={{ fontFamily: "Courier New, monospace", color: "#888888", fontSize: "11px" }}>
-                [Standard: Flow 30% &bull; Wordplay 20% &bull; Storytelling 20% &bull; Rhyming 15% &bull; Punchlines 15%]
+                [Standard: Flow 30% &bull; Rhyme Craft 22% &bull; Wordplay 20% &bull; Storytelling 16% &bull; Punchlines 12%]
               </span>
             </p>
           )}
@@ -578,10 +578,10 @@ export default function Home() {
             <tbody>
               {[
                 ["Flow (30%)", "Line length consistency, syllable approximation, cadence variation, rhythm pocket"],
+                ["Rhyme Craft (22%)", "End rhyme density, internal rhymes, multisyllabic patterns, rhyme chain length"],
                 ["Wordplay (20%)", "Metaphors, similes, double meanings, callbacks, layered language"],
-                ["Storytelling (20%)", "Narrative progression, POV consistency, emotional arc, thematic coherence"],
-                ["Rhyming (15%)", "End rhyme density, internal rhymes, multisyllabic patterns, rhyme chain length"],
-                ["Punchlines (15%)", "Setup and payoff structure, punch density, surprise, contrast"],
+                ["Storytelling (16%)", "Narrative progression, POV consistency, emotional arc, thematic coherence"],
+                ["Punchlines (12%)", "Setup and payoff structure, punch density, surprise, contrast"],
               ].map(([cat, desc], i) => (
                 <tr key={cat} style={{ background: i % 2 === 0 ? "#fff" : "#f5f3ef", borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: "5px 8px", fontWeight: 700, whiteSpace: "nowrap", color: "#1a3a7a", fontFamily: "Arial, sans-serif", fontSize: "12px" }}>{cat}</td>

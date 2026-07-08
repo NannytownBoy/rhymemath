@@ -121,7 +121,7 @@ export default function About() {
           </table>
           <div style={{ padding: "8px 14px 10px 14px", borderTop: "1px solid #e8e8e8", background: "#fafafa" }}>
             <span style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: "#666" }}>
-              Scoring engine: <strong>v4.1</strong> (CID cultural intelligence layer active) &mdash; future updates tracked as v4.2, v4.3, etc. Major formula changes increment the major version (v5, v6).
+              Scoring engine: <strong>v4.1</strong> &mdash; enhanced by the proprietary <strong>PH Labs Cultural Intelligence Index</strong>. Future updates tracked as v4.2, v4.3, etc. Major formula changes increment the major version (v5, v6).
             </span>
           </div>
         </div>
