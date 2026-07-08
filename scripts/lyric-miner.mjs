@@ -270,12 +270,45 @@ function geniusGet(endpoint) {
 async function searchArtist(name) {
   const res = await geniusGet(`/search?q=${encodeURIComponent(name)}`);
   const hits = res.response?.hits || [];
+  const nameLower = name.toLowerCase();
+
+  // Pass 1: exact match on primary artist name
   for (const hit of hits) {
     const a = hit.result?.primary_artist;
-    if (a && a.name.toLowerCase().includes(name.toLowerCase())) return a.id;
+    if (a && a.name.toLowerCase() === nameLower) return a.id;
   }
-  // fallback: return first artist id
-  return hits[0]?.result?.primary_artist?.id || null;
+
+  // Pass 2: partial match on primary artist name
+  for (const hit of hits) {
+    const a = hit.result?.primary_artist;
+    if (a && a.name.toLowerCase().includes(nameLower)) return a.id;
+  }
+
+  // Pass 3: check all primary_artists array (handles multi-artist credits)
+  for (const hit of hits) {
+    const artists = hit.result?.primary_artists || [];
+    for (const a of artists) {
+      if (a.name.toLowerCase().includes(nameLower)) return a.id;
+    }
+  }
+
+  // Pass 4: check featured artists
+  for (const hit of hits) {
+    const featured = hit.result?.featured_artists || [];
+    for (const a of featured) {
+      if (a.name.toLowerCase().includes(nameLower)) return a.id;
+    }
+  }
+
+  // Pass 5: search by artist_names string field
+  for (const hit of hits) {
+    const artistNames = hit.result?.artist_names || "";
+    if (artistNames.toLowerCase().includes(nameLower)) {
+      return hit.result?.primary_artist?.id || null;
+    }
+  }
+
+  return null;
 }
 
 async function getArtistSongs(artistId, perPage = 20) {
