@@ -267,28 +267,44 @@ function geniusGet(endpoint) {
   });
 }
 
+// Known artist IDs for artists with special characters or unusual Genius spellings
+const KNOWN_ARTIST_IDS = {
+  "jay-z": 2, "jayz": 2, "jay z": 2,
+  "jay-z (ft.": 2, // partial match guard
+};
+
 async function searchArtist(name) {
+  // Check known IDs first (handles special chars like JAŸ-Z)
+  const nameLower = name.toLowerCase().trim();
+  if (KNOWN_ARTIST_IDS[nameLower]) return KNOWN_ARTIST_IDS[nameLower];
+
   const res = await geniusGet(`/search?q=${encodeURIComponent(name)}`);
   const hits = res.response?.hits || [];
-  const nameLower = name.toLowerCase();
 
-  // Pass 1: exact match on primary artist name
+  // Normalize: strip diacritics for comparison
+  const normalize = (s) => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents
+    .replace(/[^a-z0-9\s-]/g, "").trim();
+
+  const nameNorm = normalize(name);
+
+  // Pass 1: exact normalized match on primary artist
   for (const hit of hits) {
     const a = hit.result?.primary_artist;
-    if (a && a.name.toLowerCase() === nameLower) return a.id;
+    if (a && normalize(a.name) === nameNorm) return a.id;
   }
 
-  // Pass 2: partial match on primary artist name
+  // Pass 2: partial normalized match on primary artist
   for (const hit of hits) {
     const a = hit.result?.primary_artist;
-    if (a && a.name.toLowerCase().includes(nameLower)) return a.id;
+    if (a && normalize(a.name).includes(nameNorm)) return a.id;
   }
 
-  // Pass 3: check all primary_artists array (handles multi-artist credits)
+  // Pass 3: check all primary_artists array
   for (const hit of hits) {
     const artists = hit.result?.primary_artists || [];
     for (const a of artists) {
-      if (a.name.toLowerCase().includes(nameLower)) return a.id;
+      if (normalize(a.name).includes(nameNorm)) return a.id;
     }
   }
 
@@ -296,14 +312,14 @@ async function searchArtist(name) {
   for (const hit of hits) {
     const featured = hit.result?.featured_artists || [];
     for (const a of featured) {
-      if (a.name.toLowerCase().includes(nameLower)) return a.id;
+      if (normalize(a.name).includes(nameNorm)) return a.id;
     }
   }
 
-  // Pass 5: search by artist_names string field
+  // Pass 5: normalized artist_names string
   for (const hit of hits) {
     const artistNames = hit.result?.artist_names || "";
-    if (artistNames.toLowerCase().includes(nameLower)) {
+    if (normalize(artistNames).includes(nameNorm)) {
       return hit.result?.primary_artist?.id || null;
     }
   }
