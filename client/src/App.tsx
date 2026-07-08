@@ -75,7 +75,7 @@ function Footer() {
         {/* Bottom row */}
         <p style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#aabbdd", margin: 0, textAlign: "center" }}>
           &copy; {new Date().getFullYear()}{" "}
-          <strong style={{ color: "#ffffff" }}>RhymeMath</strong>
+          <strong style={{ color: "#ffffff" }}>RhymeMa<span style={{ color: "#f5c518" }}>+</span>h</strong>
           {" | "}
           Powered by <strong style={{ color: "#f5c842" }}>Petite Haché Labs</strong>
           {" | "}

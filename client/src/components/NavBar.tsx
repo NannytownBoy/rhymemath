@@ -28,7 +28,7 @@ export function NavBar() {
               letterSpacing: "-0.03em",
               textShadow: "1px 1px 0 #000000",
             }}>
-              Rhyme<span style={{ color: "#ffcc44" }}>Math</span>
+              RhymeMa<span style={{ color: "#f5c518" }}>+</span>h
             </span>
           </div>
         </Link>

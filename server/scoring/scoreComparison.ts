@@ -46,7 +46,7 @@ import type {
 } from "@shared/schema";
 
 // ─── Weights ──────────────────────────────────────────────────────────────────
-const DEFAULT_WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.18, storytelling: 0.18, punchlines: 0.12 };
+const DEFAULT_WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
 // NOTE: WEIGHTS is now passed as a parameter to every function — no mutable module state
 
 // ─── Measure a Single Verse ───────────────────────────────────────────────────

@@ -3,8 +3,8 @@ import { Link } from "wouter";
 const CATEGORIES = [
   { name: "Flow", weight: "30%", desc: "Cadence pocket (syllable variation in the groove zone), percussive attack (hard consonant density), internal assonance (vowel sound recurrence), phrase symmetry (anaphora/parallel structures), and multisyllabic rhyme chains." },
   { name: "Rhyme Craft", weight: "22%", desc: "End rhyme density, internal rhyme density, repeated vowel and consonant sounds, multisyllabic rhyme approximation, polysyllabic rhyme pairs, and rhyme chain length." },
-  { name: "Wordplay", weight: "18%", desc: "Metaphors, similes, homophones, double meanings, references, reversals, callbacks, and layered language." },
-  { name: "Storytelling", weight: "18%", desc: "Clear topic, narrative progression, chronology, emotional arc, callbacks, thematic consistency, and verse coherence." },
+  { name: "Wordplay", weight: "20%", desc: "Metaphors, similes, homophones, double meanings, references, reversals, callbacks, and layered language." },
+  { name: "Storytelling", weight: "16%", desc: "Clear topic, narrative progression, chronology, emotional arc, callbacks, thematic consistency, and verse coherence." },
   { name: "Punchlines", weight: "12%", desc: "Setup and payoff structure, surprise factor, reversals, quotability, contrast, and punch density." },
 ];
 
