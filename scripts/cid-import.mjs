@@ -63,6 +63,9 @@ console.log('Step 4: cultural_records (V5_4_Mined_Refs)...');
 const minedRefs = readCSV('v5_4_mined_refs.csv');
 for (const row of minedRefs) {
   try {
+    // Support both 'term' and 'canonical_label' column names (CSV export variation)
+    const termValue = row.term || row.canonical_label || row.display_label || null;
+    const meaningValue = row.canonical_meaning || row.definition || row.display_label || null;
     await pool.query(`
       INSERT INTO cid_cultural_records
         (record_id, term, canonical_meaning, category_primary, category_secondary,
@@ -77,7 +80,7 @@ for (const row of minedRefs) {
         status = EXCLUDED.status,
         confidence = EXCLUDED.confidence
     `, [
-      row.record_id, row.term, str(row.canonical_meaning),
+      row.record_id, termValue, str(meaningValue),
       str(row.category_primary), str(row.category_secondary),
       str(row.domains), str(row.era), str(row.region),
       int(row.confidence), str(row.review_status) || 'needs_review',
