@@ -15,6 +15,10 @@ function toTitleCase(s: string): string {
   const MINORS = new Set(['a','an','the','and','but','or','for','nor','on','at','to','by','in','of','up','as','is','it','if']);
   // Known all-caps rapper names / acronyms that must NOT be lowercased
   const PRESERVE_CAPS = new Set(['JID','DMX','AZ','BIG','UGK','TDE','NYC','LA','DJ','MC','OG','RZA','GZA','MF','MCA','BDP','KRS','NWA','EPMD','LL','JAY','WC']);
+  const PRESERVE_HYPHENATED: Record<string,string> = { 'mach-hommy': 'Mach-Hommy' };
+  // Check full string against hyphenated lookup first
+  const fullLower = s.trim().toLowerCase();
+  if (PRESERVE_HYPHENATED[fullLower]) return PRESERVE_HYPHENATED[fullLower];
   return s.trim().replace(/\w\S*/g, (word, offset) => {
     // Preserve known all-caps names and acronyms (2-5 all-uppercase letters)
     const upper = word.toUpperCase();
