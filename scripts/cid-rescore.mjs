@@ -104,7 +104,7 @@ function computeFullCIDBonus(verse, lineCount, cid) {
   }
 
   const totalRefMatches = canonicalMatches + aliasMatches;
-  const culturalReferenceDensity = Math.min(1, totalRefMatches / Math.max(1, lineCount * 0.25));
+  const culturalReferenceDensity = Math.min(1, totalRefMatches / Math.max(1, lineCount * 0.15));
 
   if (totalRefMatches > 0) {
     const top = matchedEntityLabels.slice(0, 5).join(", ");

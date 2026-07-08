@@ -331,7 +331,10 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
 
     // Combined cultural reference density across layers 1 + 2
     const totalRefMatches = canonicalMatches + aliasMatches;
-    const culturalReferenceDensity = Math.min(1, totalRefMatches / Math.max(1, lineCount * 0.25));
+    // Density denominator: 0.15 means 2 hits in a 16-line verse = density 0.83
+    // Tuned to approximate the "oh shit" recognition threshold —
+    // even 1-2 authentic cultural hits in a verse is a meaningful signal
+    const culturalReferenceDensity = Math.min(1, totalRefMatches / Math.max(1, lineCount * 0.15));
 
     if (totalRefMatches > 0) {
       const topRefs = matchedEntityLabels.slice(0, 5).join(", ");
