@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
+import { scoreCIDSignals } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
@@ -165,6 +166,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         verse: effectiveVerse,
         weights: isCustom ? rawWeights! : undefined,
       });
+
+      // ── CID v5.4 bonus signals (async, additive, non-breaking) ────────────
+      try {
+        const lineCount = effectiveVerse.split('\n').filter(l => l.trim()).length;
+        const cidSignals = await scoreCIDSignals(effectiveVerse, lineCount);
+        if (cidSignals.aliasMatches > 0 || cidSignals.entendreMatches > 0 || cidSignals.punchlineMatches > 0) {
+          // Additive bonus: up to +8 wordplay, +5 punchlines — weighted, capped
+          const wordplayBonus = Math.min(8, cidSignals.culturalReferenceDensity * 5 + cidSignals.entendreScore * 6);
+          const punchBonus    = Math.min(5, cidSignals.punchlinePatternScore * 8);
+          result.scores.wordplay  = Math.min(100, result.scores.wordplay  + wordplayBonus);
+          result.scores.punchlines = Math.min(100, result.scores.punchlines + punchBonus);
+          // Recalculate overall with updated scores
+          const w = isCustom ? result.customWeights! : { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
+          result.scores.overall = Math.min(100,
+            result.scores.flow         * (w as any).flow +
+            result.scores.rhyming      * (w as any).rhyming +
+            result.scores.wordplay     * (w as any).wordplay +
+            result.scores.storytelling * (w as any).storytelling +
+            result.scores.punchlines   * (w as any).punchlines
+          );
+          // Append CID evidence to explanation
+          if (cidSignals.evidence.length > 0) {
+            result.explanation += ' ' + cidSignals.evidence.join(' ');
+          }
+        }
+      } catch (cidErr) {
+        // CID failure is always non-fatal
+        console.error('CID scoring error (non-fatal):', cidErr);
+      }
 
       try {
         const cleanArtistName = toTitleCase(artistName);

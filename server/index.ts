@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { startIntegrityScheduler } from "./integrity";
+import { startCIDSyncScheduler } from "./cidSync";
 import { createServer } from "node:http";
 import { Pool } from "pg";
 
@@ -376,6 +377,7 @@ app.use((req, res, next) => {
   await ensureTables();
   await registerRoutes(httpServer, app);
   startIntegrityScheduler();
+  startCIDSyncScheduler();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
