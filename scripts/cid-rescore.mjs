@@ -19,6 +19,7 @@
  *   DATABASE_URL="postgresql://..." node scripts/cid-rescore.mjs
  *
  * Safe to re-run — idempotent. Rows already at v4.1 are skipped.
+ * Use --force to reprocess all rows (needed after importing new CID batch data).
  * ───────────────────────────────────────────────────────────────────
  */
 
@@ -110,6 +111,8 @@ function computeCIDBonus(verse, lineCount, cid) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
+const FORCE = process.argv.includes("--force");
+
 async function main() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -174,7 +177,7 @@ async function main() {
 
   for (const row of analyses) {
     // Skip rows already at target version
-    if (row.scoring_mode === `standard-${SCORING_VERSION}`) {
+    if (!FORCE && row.scoring_mode === `standard-${SCORING_VERSION}`) {
       skipped++;
       continue;
     }
