@@ -255,16 +255,29 @@ function geniusGet(endpoint) {
     const options = {
       hostname: "api.genius.com",
       path: endpoint,
-      headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${GENIUS_TOKEN}`,
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json",
+      },
     };
-    https.get(options, (res) => {
+    const req = https.request(options, (res) => {
+      // Follow redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const loc = res.headers.location;
+        const url = new URL(loc.startsWith("http") ? loc : `https://api.genius.com${loc}`);
+        return geniusGet(url.pathname + url.search).then(resolve).catch(reject);
+      }
       let data = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => {
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON parse failed: ${data.slice(0, 100)}`)); }
+        catch (e) { reject(new Error(`JSON parse failed (status ${res.statusCode}): ${data.slice(0, 200)}`)); }
       });
-    }).on("error", reject);
+    });
+    req.on("error", reject);
+    req.end();
   });
 }
 
@@ -329,12 +342,10 @@ async function searchArtist(name) {
 }
 
 async function getArtistSongs(artistId, perPage = 20) {
-  const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}`);
+  const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}&page=1`);
   const songs = res.response?.songs || [];
   if (!songs.length) {
-    // Some artists require page-based pagination fallback
-    const res2 = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}&page=1`);
-    return res2.response?.songs || [];
+    console.warn(`  [debug] API status: ${res.meta?.status}, response keys: ${Object.keys(res.response || {}).join(", ")}`);
   }
   return songs;
 }
