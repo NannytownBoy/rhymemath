@@ -1,0 +1,585 @@
+/**
+ * lyric-miner.mjs
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PH Labs Cultural Intelligence Index — Lyric Miner
+ *
+ * Pulls lyrics from Genius, analyzes them for cultural signals, and outputs
+ * a v5.4-formatted CSV ready for cid-import.mjs.
+ *
+ * WHAT IT DETECTS:
+ *   - Proper nouns (brands, places, people, crews, labels)
+ *   - Slang / alias candidates (non-dictionary words used as nouns)
+ *   - Luxury markers (known brand cross-reference)
+ *   - Geographic references (city, borough, block, hood)
+ *   - Repeated anchor phrases (3+ occurrences = strong signal)
+ *   - Double meaning candidates (same word in multiple semantic contexts)
+ *
+ * OUTPUT:
+ *   Two CSV files in --outdir:
+ *     ph_cie_records_YYYY-MM-DD.csv   → cid_cultural_records rows (high conf → approved)
+ *     ph_cie_aliases_YYYY-MM-DD.csv   → cid_aliases rows (slang → canonical)
+ *
+ * USAGE:
+ *   # Mine a single song by Genius URL:
+ *   GENIUS_TOKEN="..." node scripts/lyric-miner.mjs --url "https://genius.com/Ghostface-killah-..." --artist "Ghostface Killah"
+ *
+ *   # Mine all top songs for an artist:
+ *   GENIUS_TOKEN="..." node scripts/lyric-miner.mjs --artist "Ghostface Killah" --songs 10
+ *
+ *   # Mine from a local lyrics .txt file (one verse per line, blank line between verses):
+ *   GENIUS_TOKEN="..." node scripts/lyric-miner.mjs --file /path/to/lyrics.txt --artist "Cam'ron"
+ *
+ *   # Custom output directory:
+ *   GENIUS_TOKEN="..." node scripts/lyric-miner.mjs --artist "Jay-Z" --songs 15 --outdir ~/Desktop/cid_exports
+ *
+ * THEN IMPORT:
+ *   DATABASE_URL="..." node scripts/cid-import.mjs --dir ~/Desktop/cid_exports
+ *   DATABASE_URL="..." node scripts/cid-rescore.mjs --force
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+import fs from "fs";
+import path from "path";
+import https from "https";
+
+// ── CLI args ──────────────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+const getArg = (flag) => { const i = args.indexOf(flag); return i !== -1 ? args[i + 1] : null; };
+const hasFlag = (flag) => args.includes(flag);
+
+const GENIUS_TOKEN = process.env.GENIUS_TOKEN;
+const ARTIST_NAME  = getArg("--artist");
+const SONG_URL     = getArg("--url");
+const LOCAL_FILE   = getArg("--file");
+const SONG_COUNT   = parseInt(getArg("--songs") || "10", 10);
+const OUT_DIR      = getArg("--outdir") || process.cwd();
+
+if (!ARTIST_NAME) {
+  console.error("Usage: GENIUS_TOKEN=... node scripts/lyric-miner.mjs --artist \"Ghostface Killah\" [--songs 10] [--url ...] [--file ...] [--outdir ...]");
+  process.exit(1);
+}
+
+if (!GENIUS_TOKEN && !LOCAL_FILE) {
+  console.error("Error: GENIUS_TOKEN env var required unless using --file mode.");
+  process.exit(1);
+}
+
+// ── Known CID terms to skip (already in DB — no duplicates) ─────────────────
+const EXISTING_CID = new Set([
+  "fully","out of bounds","long beach","bebe's kids","burner","91 freeway","bool",
+  "olde english 800","forty ounce","real p","rollie","rolex","benz","quarter m",
+  "whip","wifebeater","pen","homie debt","real nigga records","run it up","section",
+  "gold bottle gang","lil whoadie","pawn shop","no dome","hustlers","energy",
+  "jay worthy","los angeles","b-legit","bay area","independent bosses",
+  "debt-free flex","strain","mozzy","payroll giovanni","money phone",
+  "gossip versus goals","neck","chain","old me","realness","goals","bigger chain",
+  "litty","section culture","regional network flex","benz on the wrist",
+  "west coast rap geography","automotive flex","jewelry flex",
+  // Aliases
+  "oe","rollie","benz","whip","burner","fully","91","la","the bay","whoadie",
+  "pen","no dome","quarter m","real p","bool","nelas","boldy","smittys",
+  "b-legit","payroll","mozzy","jay worthy","section","chain",
+]);
+
+// ── Vocabulary reference lists ───────────────────────────────────────────────
+
+const LUXURY_BRANDS = new Set([
+  "gucci","louis","lv","fendi","prada","versace","armani","burberry","balenciaga",
+  "givenchy","off-white","supreme","bape","stone island","moncler","hermès","hermes",
+  "saint laurent","ysl","bottega","dior","celine","mcm","goyard","moynat",
+  "patek","ap","audemars","richard mille","jacob","jacob & co","chopard",
+  "ferrari","lambo","lamborghini","porsche","maybach","bentley","rolls","rolls-royce",
+  "aston","maserati","bugatti","escalade","phantom","ghost","wraith","cullinan",
+  "christian louboutin","louboutin","red bottoms","giuseppe","zanotti",
+  "timberland","timbs","air force","jordan","yeezys","yeezy","new balance",
+  "amiri","rhude","chrome hearts","fear of god","fog","palm angels",
+  "ace of spades","armand de brignac","cristal","dom pérignon","dom p",
+  "hennessy","henny","rémy","remy martin","dusse","d'ussé","ciroc","belvedere",
+]);
+
+const GEO_MARKERS = new Set([
+  // NYC
+  "harlem","marcy","bedford-stuyvesant","bed-stuy","brownsville","flatbush",
+  "crown heights","east new york","south bronx","queensbridge","hollis",
+  "compton","inglewood","watts","crenshaw","leimert park","south central",
+  "brooklyn","the bronx","queens","staten island","shaolin",
+  // ATL
+  "bankhead","decatur","college park","zone 6","zone 3","east atlanta","buckhead",
+  // Chicago
+  "chiraq","englewood","roseland","south side","79th","63rd",
+  // Detroit
+  "flint","8 mile","7 mile","delray",
+  // Houston
+  "fifth ward","third ward","slab","screwed up","h-town",
+  // Philly
+  "north philly","west philly","south philly","germantown",
+  // Pittsburgh / Buffalo
+  "griselda","buffalo","716",
+  // General
+  "the projects","the pj","bricks","the hood","the block","the ave",
+  "uptown","downtown","the 6","tdot","toronto",
+]);
+
+const STREET_LEXICON = new Set([
+  // Weapons
+  "stick","pipe","banger","ratchet","hammer","heater","iron","toast","tre pound",
+  "four fifth","four-fifth","nina","deuce deuce","mac","choppa","chop","drac","draco",
+  // Drugs
+  "brick","ki","key","bird","work","hard","soft","crack","raw","base","cook up",
+  "dutch","backwood","blunt","spliff","reefer","gas","loud","pack","zips","zona",
+  // Money
+  "bread","gwop","guap","cake","paper","racks","bands","m","milli","stacks","blue faces",
+  "blue faces","dead presidents","c-notes","knots","knot",
+  // Status
+  "iced out","froze","dripped","draped","glossy","fresh","clean","steez","swag",
+  "on sight","on site","slide","spin","twirl","step","move different",
+  // People
+  "shorty","shawty","homie","homey","cuz","fam","gang","opps","opp","jakes",
+  "boys","12","five-o","po-po","alphabet boys","feds","fiends","junkies",
+]);
+
+const COMMON_WORDS = new Set([
+  "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
+  "from","up","about","into","through","during","before","after","above","below",
+  "between","out","off","over","under","again","then","once","here","there",
+  "when","where","why","how","all","both","each","few","more","most","other",
+  "some","such","no","not","only","same","than","too","very","just","because",
+  "as","until","while","although","though","since","unless","whether","if",
+  "this","that","these","those","i","me","my","myself","we","our","ours",
+  "you","your","yours","he","his","him","she","her","hers","it","its","they",
+  "them","their","what","which","who","whom","got","get","got","like","said",
+  "know","time","been","have","will","would","could","should","may","might",
+  "must","shall","gonna","gotta","wanna","tryna","ima","imma","nigga","niggas",
+  "yeah","yea","ay","aye","oh","ah","uh","um","man","bro","real","talk",
+  "make","take","come","go","see","think","feel","tell","put","need","want",
+  "way","day","back","look","give","use","work","first","long","last","never",
+  "always","still","even","well","also","now","right","down","thing","things",
+]);
+
+// ── Genius API helpers ────────────────────────────────────────────────────────
+
+function geniusGet(endpoint) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.genius.com",
+      path: endpoint,
+      headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
+    };
+    https.get(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error(`JSON parse failed: ${data.slice(0, 100)}`)); }
+      });
+    }).on("error", reject);
+  });
+}
+
+async function searchArtist(name) {
+  const res = await geniusGet(`/search?q=${encodeURIComponent(name)}`);
+  const hits = res.response?.hits || [];
+  for (const hit of hits) {
+    const a = hit.result?.primary_artist;
+    if (a && a.name.toLowerCase().includes(name.toLowerCase())) return a.id;
+  }
+  // fallback: return first artist id
+  return hits[0]?.result?.primary_artist?.id || null;
+}
+
+async function getArtistSongs(artistId, perPage = 20) {
+  const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}`);
+  return res.response?.songs || [];
+}
+
+async function getSongById(songId) {
+  const res = await geniusGet(`/songs/${songId}`);
+  return res.response?.song || null;
+}
+
+async function getSongByUrl(url) {
+  // Extract song path and search for it
+  const slug = url.split("genius.com/")[1]?.replace(/-lyrics$/, "").replace(/-/g, " ");
+  if (!slug) return null;
+  const res = await geniusGet(`/search?q=${encodeURIComponent(slug)}`);
+  const hits = res.response?.hits || [];
+  return hits[0]?.result || null;
+}
+
+// Fetch actual lyrics text via scraping the Genius page (API doesn't return full lyrics)
+function fetchLyricsFromPage(url) {
+  return new Promise((resolve) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; research/1.0)",
+        "Accept": "text/html",
+      },
+    };
+    https.get(options, (res) => {
+      let html = "";
+      res.on("data", (chunk) => (html += chunk));
+      res.on("end", () => {
+        // Extract text between data-lyrics-container divs
+        const matches = [...html.matchAll(/data-lyrics-container[^>]*>([\s\S]*?)<\/div>/g)];
+        if (!matches.length) { resolve(""); return; }
+        let lyrics = matches.map(m => m[1]).join("\n");
+        // Strip HTML tags
+        lyrics = lyrics.replace(/<br\s*\/?>/gi, "\n");
+        lyrics = lyrics.replace(/<[^>]+>/g, "");
+        // Decode HTML entities
+        lyrics = lyrics.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+          .replace(/&apos;/g, "'");
+        resolve(lyrics.trim());
+      });
+    }).on("error", () => resolve(""));
+  });
+}
+
+// ── Text analysis ─────────────────────────────────────────────────────────────
+
+function tokenize(text) {
+  return text.toLowerCase()
+    .replace(/[^\w\s'-]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 1);
+}
+
+function extractProperNouns(text) {
+  // Capitalized words/phrases not at line start
+  const results = new Set();
+  const lines = text.split("\n");
+  for (const line of lines) {
+    const words = line.split(/\s+/);
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      // Skip first word of line (always capitalized)
+      if (i === 0) continue;
+      if (/^[A-Z][a-z]/.test(w) && w.length > 2) {
+        // Check for multi-word proper noun
+        let phrase = w;
+        let j = i + 1;
+        while (j < words.length && /^[A-Z][a-z]/.test(words[j])) {
+          phrase += " " + words[j];
+          j++;
+        }
+        const clean = phrase.replace(/[^a-zA-Z0-9\s'-]/g, "").trim();
+        if (clean.length > 2 && !COMMON_WORDS.has(clean.toLowerCase())) {
+          results.add(clean);
+        }
+      }
+    }
+  }
+  return results;
+}
+
+function extractLuxuryRefs(tokens) {
+  const hits = new Set();
+  for (const token of tokens) {
+    if (LUXURY_BRANDS.has(token)) hits.add(token);
+  }
+  // Check bigrams/trigrams
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const bi = `${tokens[i]} ${tokens[i+1]}`;
+    if (LUXURY_BRANDS.has(bi)) hits.add(bi);
+  }
+  return hits;
+}
+
+function extractGeoRefs(tokens, text) {
+  const hits = new Set();
+  const lower = text.toLowerCase();
+  for (const geo of GEO_MARKERS) {
+    if (lower.includes(geo)) hits.add(geo);
+  }
+  return hits;
+}
+
+function extractStreetLexicon(tokens, text) {
+  const hits = new Set();
+  const lower = text.toLowerCase();
+  for (const term of STREET_LEXICON) {
+    if (term.includes(" ")) {
+      if (lower.includes(term)) hits.add(term);
+    } else {
+      const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      if (re.test(lower)) hits.add(term);
+    }
+  }
+  return hits;
+}
+
+function extractRepeatedPhrases(texts) {
+  // Find 2-4 word phrases that appear 3+ times across the corpus
+  const phraseCount = {};
+  for (const text of texts) {
+    const words = tokenize(text);
+    for (let n = 2; n <= 4; n++) {
+      for (let i = 0; i <= words.length - n; i++) {
+        const phrase = words.slice(i, i + n).join(" ");
+        if (phrase.split(" ").every(w => !COMMON_WORDS.has(w) && w.length > 2)) {
+          phraseCount[phrase] = (phraseCount[phrase] || 0) + 1;
+        }
+      }
+    }
+  }
+  return Object.entries(phraseCount)
+    .filter(([, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .map(([phrase]) => phrase);
+}
+
+// ── CID candidate builder ─────────────────────────────────────────────────────
+
+let recCounter = 1000; // Start above existing records to avoid conflicts
+let aliasCounter = 100;
+
+function newRecId() { return `REC54_M${String(recCounter++).padStart(4, "0")}`; }
+function newAliasId() { return `ALS54_M${String(aliasCounter++).padStart(4, "0")}`; }
+
+const TODAY = new Date().toISOString().split("T")[0];
+const SOURCE_ID = "SRC_5_4_MINER";
+
+function buildRecord({ term, definition, category, confidence, reviewStatus, shortAnchor }) {
+  return {
+    record_id: newRecId(),
+    term: term,
+    canonical_meaning: definition || "",
+    category_primary: category || "slang",
+    category_secondary: "",
+    domains: category || "slang",
+    era: "2000s-present",
+    region: "",
+    confidence: confidence || 3,
+    review_status: reviewStatus || (confidence >= 4 ? "approved" : "needs_review"),
+    status: "active",
+    source_id: SOURCE_ID,
+    risk_flag: "low",
+    sensitivity_tag: "contextual",
+    display_label: term,
+    short_anchor: shortAnchor || "",
+    notes: `Mined by lyric-miner.mjs on ${TODAY}`,
+    owner: "PH Labs Curator",
+    last_reviewed_at: TODAY,
+    approved_by: confidence >= 4 ? "PH Labs Curator" : "",
+  };
+}
+
+function buildAlias({ aliasText, canonicalRecordId, aliasType, confidence }) {
+  return {
+    alias_id: newAliasId(),
+    alias_text: aliasText,
+    canonical_record_id: canonicalRecordId,
+    alias_type: aliasType || "slang",
+    confidence: confidence || 3,
+    review_status: confidence >= 4 ? "approved" : "needs_review",
+    status: "active",
+    source_id: SOURCE_ID,
+    risk_flag: "low",
+    sensitivity_tag: "contextual",
+    display_label: aliasText,
+    notes: `Mined by lyric-miner.mjs on ${TODAY}`,
+    owner: "PH Labs Curator",
+    last_reviewed_at: TODAY,
+    approved_by: confidence >= 4 ? "PH Labs Curator" : "",
+  };
+}
+
+// ── CSV writer ────────────────────────────────────────────────────────────────
+
+function toCSVRow(obj) {
+  return Object.values(obj).map(v => {
+    const s = String(v ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(",");
+}
+
+function writeCSV(filepath, rows) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]).join(",");
+  const lines = [headers, ...rows.map(toCSVRow)].join("\n");
+  fs.writeFileSync(filepath, lines, "utf8");
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function mineText(text, songTitle) {
+  const tokens = tokenize(text);
+  const records = [];
+  const aliases = [];
+  const seen = new Set([...EXISTING_CID]);
+
+  const addIfNew = (term, buildFn) => {
+    const key = term.toLowerCase().trim();
+    if (!key || key.length < 2 || seen.has(key) || COMMON_WORDS.has(key)) return null;
+    seen.add(key);
+    const rec = buildFn();
+    records.push(rec);
+    return rec;
+  };
+
+  // Luxury brands
+  for (const brand of extractLuxuryRefs(tokens)) {
+    addIfNew(brand, () => buildRecord({
+      term: brand,
+      definition: `Luxury brand reference — status marker`,
+      category: "luxury",
+      confidence: 5,
+      reviewStatus: "approved",
+    }));
+  }
+
+  // Geographic references
+  for (const geo of extractGeoRefs(tokens, text)) {
+    addIfNew(geo, () => buildRecord({
+      term: geo,
+      definition: `Geographic reference — place/neighborhood`,
+      category: "place",
+      confidence: 4,
+      reviewStatus: "approved",
+    }));
+  }
+
+  // Street lexicon
+  for (const term of extractStreetLexicon(tokens, text)) {
+    addIfNew(term, () => buildRecord({
+      term: term,
+      definition: `Street/slang term`,
+      category: "slang",
+      confidence: 3,
+      reviewStatus: "needs_review",
+    }));
+  }
+
+  // Proper nouns (capitalized non-line-start words)
+  for (const noun of extractProperNouns(text)) {
+    addIfNew(noun, () => buildRecord({
+      term: noun,
+      definition: `Proper noun detected in: ${songTitle}`,
+      category: "entity",
+      confidence: 3,
+      reviewStatus: "needs_review",
+    }));
+  }
+
+  return { records, aliases };
+}
+
+async function main() {
+  console.log(`\n╔═══════════════════════════════════════════════════╗`);
+  console.log(`║  PH Labs CID Lyric Miner                          ║`);
+  console.log(`║  Artist: ${ARTIST_NAME.padEnd(40)}║`);
+  console.log(`╚═══════════════════════════════════════════════════╝\n`);
+
+  const allRecords = [];
+  const allAliases = [];
+  const allTexts = [];
+
+  // ── Source: local file ───────────────────────────────────────────────────
+  if (LOCAL_FILE) {
+    console.log(`Reading local file: ${LOCAL_FILE}`);
+    const text = fs.readFileSync(LOCAL_FILE, "utf8");
+    allTexts.push(text);
+    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE));
+    allRecords.push(...records);
+    allAliases.push(...aliases);
+    console.log(`  Found ${records.length} candidate records\n`);
+  }
+
+  // ── Source: Genius API ───────────────────────────────────────────────────
+  else if (GENIUS_TOKEN) {
+    let songs = [];
+
+    if (SONG_URL) {
+      console.log(`Fetching song from URL...`);
+      const song = await getSongByUrl(SONG_URL);
+      if (song) songs = [song];
+    } else {
+      console.log(`Searching Genius for artist: ${ARTIST_NAME}...`);
+      const artistId = await searchArtist(ARTIST_NAME);
+      if (!artistId) { console.error("Artist not found on Genius."); process.exit(1); }
+      console.log(`Found artist ID: ${artistId}`);
+      songs = await getArtistSongs(artistId, SONG_COUNT);
+      console.log(`Found ${songs.length} songs\n`);
+    }
+
+    for (const song of songs) {
+      const title = song.full_title || song.title;
+      process.stdout.write(`  Mining: ${title.substring(0, 60)}... `);
+      try {
+        const lyricsUrl = song.url;
+        const text = await fetchLyricsFromPage(lyricsUrl);
+        if (!text || text.length < 50) {
+          console.log(`(no lyrics found, skipping)`);
+          continue;
+        }
+        allTexts.push(text);
+        const { records, aliases } = await mineText(text, title);
+        allRecords.push(...records);
+        allAliases.push(...aliases);
+        console.log(`+${records.length} records`);
+        // Small delay to be respectful of Genius rate limits
+        await new Promise(r => setTimeout(r, 800));
+      } catch (e) {
+        console.log(`(error: ${e.message})`);
+      }
+    }
+
+    // Cross-corpus repeated phrases
+    if (allTexts.length > 1) {
+      console.log(`\nAnalyzing repeated phrases across ${allTexts.length} songs...`);
+      const repeated = extractRepeatedPhrases(allTexts);
+      let phraseCount = 0;
+      for (const phrase of repeated.slice(0, 20)) {
+        const key = phrase.toLowerCase();
+        if (!EXISTING_CID.has(key) && !COMMON_WORDS.has(key)) {
+          const rec = buildRecord({
+            term: phrase,
+            definition: `Repeated phrase across ${ARTIST_NAME} corpus`,
+            category: "slang",
+            confidence: 4,
+            reviewStatus: "needs_review",
+            shortAnchor: phrase,
+          });
+          allRecords.push(rec);
+          phraseCount++;
+        }
+      }
+      if (phraseCount) console.log(`  +${phraseCount} repeated phrase candidates`);
+    }
+  }
+
+  // ── Write output ─────────────────────────────────────────────────────────
+  if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+
+  const recordsFile = path.join(OUT_DIR, `v5_4_mined_refs.csv`);
+  const aliasesFile = path.join(OUT_DIR, `v5_4_alias_additions.csv`);
+
+  // Deduplicate by term
+  const uniqueRecords = [];
+  const seenTerms = new Set();
+  for (const r of allRecords) {
+    const key = r.term.toLowerCase();
+    if (!seenTerms.has(key)) { seenTerms.add(key); uniqueRecords.push(r); }
+  }
+
+  writeCSV(recordsFile, uniqueRecords);
+  writeCSV(aliasesFile, allAliases);
+
+  console.log(`\n─────────────────────────────────────────────────────`);
+  console.log(`  Mining complete`);
+  console.log(`  Records found:  ${uniqueRecords.length}`);
+  console.log(`  Aliases found:  ${allAliases.length}`);
+  console.log(`  Output dir:     ${OUT_DIR}`);
+  console.log(`─────────────────────────────────────────────────────`);
+  console.log(`\nNext steps:`);
+  console.log(`  1. Review and clean the CSVs (delete bad rows)`);
+  console.log(`  2. DATABASE_URL="..." node scripts/cid-import.mjs --dir "${OUT_DIR}"`);
+  console.log(`  3. DATABASE_URL="..." node scripts/cid-rescore.mjs --force\n`);
+}
+
+main().catch(err => { console.error("Fatal:", err); process.exit(1); });
