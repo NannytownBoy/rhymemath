@@ -40,36 +40,24 @@
 
 import fs from "fs";
 import path from "path";
-import https from "https";
 
 // ── AI enrichment via OpenAI (optional — set OPENAI_API_KEY to enable) ────────
 const AI_ENABLED = !!process.env.OPENAI_API_KEY;
 
-function openAIPost(payload) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify(payload);
-    const options = {
-      hostname: "api.openai.com",
-      path: "/v1/chat/completions",
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-      },
-    };
-    const req = https.request(options, (res) => {
-      let data = "";
-      res.on("data", chunk => data += chunk);
-      res.on("end", () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`AI parse failed: ${data.slice(0, 200)}`)); }
-      });
-    });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
+async function openAIPost(payload) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OpenAI error ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json();
 }
 
 /**
@@ -250,35 +238,20 @@ const COMMON_WORDS = new Set([
 
 // ── Genius API helpers ────────────────────────────────────────────────────────
 
-function geniusGet(endpoint) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: "api.genius.com",
-      path: endpoint,
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${GENIUS_TOKEN}`,
-        "User-Agent": "Mozilla/5.0",
-        Accept: "application/json",
-      },
-    };
-    const req = https.request(options, (res) => {
-      // Follow redirects
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const loc = res.headers.location;
-        const url = new URL(loc.startsWith("http") ? loc : `https://api.genius.com${loc}`);
-        return geniusGet(url.pathname + url.search).then(resolve).catch(reject);
-      }
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON parse failed (status ${res.statusCode}): ${data.slice(0, 200)}`)); }
-      });
-    });
-    req.on("error", reject);
-    req.end();
+async function geniusGet(endpoint) {
+  const url = `https://api.genius.com${endpoint}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${GENIUS_TOKEN}`,
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      Accept: "application/json",
+    },
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Genius API error ${res.status} on ${endpoint}: ${text.slice(0, 150)}`);
+  }
+  return res.json();
 }
 
 // Known artist IDs for artists with special characters or unusual Genius spellings
@@ -364,37 +337,32 @@ async function getSongByUrl(url) {
   return hits[0]?.result || null;
 }
 
-// Fetch actual lyrics text via scraping the Genius page (API doesn't return full lyrics)
-function fetchLyricsFromPage(url) {
-  return new Promise((resolve) => {
-    const urlObj = new URL(url);
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname,
+// Fetch actual lyrics text via the Genius page (API doesn't return full lyrics)
+async function fetchLyricsFromPage(url) {
+  try {
+    const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; research/1.0)",
-        "Accept": "text/html",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
       },
-    };
-    https.get(options, (res) => {
-      let html = "";
-      res.on("data", (chunk) => (html += chunk));
-      res.on("end", () => {
-        // Extract text between data-lyrics-container divs
-        const matches = [...html.matchAll(/data-lyrics-container[^>]*>([\s\S]*?)<\/div>/g)];
-        if (!matches.length) { resolve(""); return; }
-        let lyrics = matches.map(m => m[1]).join("\n");
-        // Strip HTML tags
-        lyrics = lyrics.replace(/<br\s*\/?>/gi, "\n");
-        lyrics = lyrics.replace(/<[^>]+>/g, "");
-        // Decode HTML entities
-        lyrics = lyrics.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-          .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-          .replace(/&apos;/g, "'");
-        resolve(lyrics.trim());
-      });
-    }).on("error", () => resolve(""));
-  });
+    });
+    const html = await res.text();
+    // Extract text between data-lyrics-container divs
+    const matches = [...html.matchAll(/data-lyrics-container[^>]*>([\s\S]*?)<\/div>/g)];
+    if (!matches.length) return "";
+    let lyrics = matches.map(m => m[1]).join("\n");
+    // Strip HTML tags
+    lyrics = lyrics.replace(/<br\s*\/?>/gi, "\n");
+    lyrics = lyrics.replace(/<[^>]+>/g, "");
+    // Decode HTML entities
+    lyrics = lyrics.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'");
+    return lyrics.trim();
+  } catch (e) {
+    return "";
+  }
 }
 
 // ── Text analysis ─────────────────────────────────────────────────────────────
