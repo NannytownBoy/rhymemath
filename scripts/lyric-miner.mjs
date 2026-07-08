@@ -42,6 +42,97 @@ import fs from "fs";
 import path from "path";
 import https from "https";
 
+// ── AI enrichment via OpenAI (optional — set OPENAI_API_KEY to enable) ────────
+const AI_ENABLED = !!process.env.OPENAI_API_KEY;
+
+function openAIPost(payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const options = {
+      hostname: "api.openai.com",
+      path: "/v1/chat/completions",
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error(`AI parse failed: ${data.slice(0, 200)}`)); }
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * Enriches a batch of mined candidate terms with AI-generated context.
+ * Returns a map of term → { definition, category, confidence, sensitivity }
+ * Falls back to original values if AI is unavailable or fails.
+ */
+async function enrichWithAI(candidates, artistName) {
+  if (!AI_ENABLED || !candidates.length) return {};
+
+  // Batch up to 30 terms per AI call to minimize API usage
+  const batches = [];
+  for (let i = 0; i < candidates.length; i += 30) {
+    batches.push(candidates.slice(i, i + 30));
+  }
+
+  const enriched = {};
+
+  for (const batch of batches) {
+    const termList = batch.map((t, i) => `${i + 1}. "${t}"`).join("\n");
+    const prompt = `You are a hip-hop cultural analyst for a proprietary music intelligence system.
+
+Artist context: ${artistName}
+
+For each term below, provide a brief cultural definition as it is used in hip-hop lyrics — specifically how ${artistName} or artists in their circle use it. Focus on the cultural meaning, not the dictionary meaning. If it has multiple meanings in rap context, note the primary one.
+
+Return ONLY a JSON array with this structure (no markdown, no explanation):
+[{
+  "term": "the term",
+  "definition": "concise cultural definition (max 15 words)",
+  "category": one of: luxury/place/slang/weapon/drug/money/person/crew/brand/food/automotive/spiritual/metaphor/street",
+  "confidence": integer 3-5 (5=very well known, 4=commonly used, 3=context-dependent),
+  "sensitivity": one of: low/medium/high
+}]
+
+Terms to enrich:
+${termList}`;
+
+    try {
+      const res = await openAIPost({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 2000,
+      });
+
+      const content = res.choices?.[0]?.message?.content || "";
+      // Strip any accidental markdown fences
+      const clean = content.replace(/```json?/gi, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      for (const item of parsed) {
+        if (item.term) enriched[item.term.toLowerCase()] = item;
+      }
+      // Respect rate limits
+      await new Promise(r => setTimeout(r, 500));
+    } catch (e) {
+      console.warn(`  [AI] Enrichment batch failed (non-fatal): ${e.message}`);
+    }
+  }
+
+  return enriched;
+}
+
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const getArg = (flag) => { const i = args.indexOf(flag); return i !== -1 ? args[i + 1] : null; };
@@ -407,63 +498,65 @@ function writeCSV(filepath, rows) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function mineText(text, songTitle) {
+async function mineText(text, songTitle, artistName) {
   const tokens = tokenize(text);
   const records = [];
   const aliases = [];
   const seen = new Set([...EXISTING_CID]);
+  const pendingTerms = []; // collect all raw candidates for AI batch enrichment
 
-  const addIfNew = (term, buildFn) => {
+  const addIfNew = (term, defaultMeta) => {
     const key = term.toLowerCase().trim();
-    if (!key || key.length < 2 || seen.has(key) || COMMON_WORDS.has(key)) return null;
+    if (!key || key.length < 2 || seen.has(key) || COMMON_WORDS.has(key)) return;
     seen.add(key);
-    const rec = buildFn();
-    records.push(rec);
-    return rec;
+    pendingTerms.push({ term, ...defaultMeta });
   };
 
   // Luxury brands
   for (const brand of extractLuxuryRefs(tokens)) {
-    addIfNew(brand, () => buildRecord({
-      term: brand,
-      definition: `Luxury brand reference — status marker`,
-      category: "luxury",
-      confidence: 5,
-      reviewStatus: "approved",
-    }));
+    addIfNew(brand, { definition: `Luxury brand — status marker`, category: "luxury", confidence: 5, reviewStatus: "approved" });
   }
 
   // Geographic references
   for (const geo of extractGeoRefs(tokens, text)) {
-    addIfNew(geo, () => buildRecord({
-      term: geo,
-      definition: `Geographic reference — place/neighborhood`,
-      category: "place",
-      confidence: 4,
-      reviewStatus: "approved",
-    }));
+    addIfNew(geo, { definition: `Geographic reference`, category: "place", confidence: 4, reviewStatus: "approved" });
   }
 
   // Street lexicon
   for (const term of extractStreetLexicon(tokens, text)) {
-    addIfNew(term, () => buildRecord({
-      term: term,
-      definition: `Street/slang term`,
-      category: "slang",
-      confidence: 3,
-      reviewStatus: "needs_review",
-    }));
+    addIfNew(term, { definition: `Street/slang term`, category: "slang", confidence: 3, reviewStatus: "needs_review" });
   }
 
-  // Proper nouns (capitalized non-line-start words)
+  // Proper nouns
   for (const noun of extractProperNouns(text)) {
-    addIfNew(noun, () => buildRecord({
-      term: noun,
-      definition: `Proper noun detected in: ${songTitle}`,
-      category: "entity",
-      confidence: 3,
-      reviewStatus: "needs_review",
-    }));
+    addIfNew(noun, { definition: `Proper noun in: ${songTitle}`, category: "entity", confidence: 3, reviewStatus: "needs_review" });
+  }
+
+  // ── AI enrichment ──────────────────────────────────────────────────
+  // Only enrich terms that aren't already high-confidence (luxury/geo are fine as-is)
+  const toEnrich = pendingTerms
+    .filter(t => t.confidence < 5)
+    .map(t => t.term);
+
+  const aiContext = await enrichWithAI(toEnrich, artistName || "this artist");
+
+  // Build final records, applying AI context where available
+  for (const pending of pendingTerms) {
+    const ai = aiContext[pending.term.toLowerCase()];
+    const rec = buildRecord({
+      term: pending.term,
+      definition:   ai?.definition  || pending.definition,
+      category:     ai?.category    || pending.category,
+      confidence:   ai?.confidence  || pending.confidence,
+      reviewStatus: pending.reviewStatus,
+      shortAnchor:  "",
+    });
+    // Apply AI sensitivity if provided
+    if (ai?.sensitivity === "high") {
+      rec.risk_flag = "high";
+      rec.review_status = "needs_review"; // always force review on high sensitivity
+    }
+    records.push(rec);
   }
 
   return { records, aliases };
@@ -484,7 +577,7 @@ async function main() {
     console.log(`Reading local file: ${LOCAL_FILE}`);
     const text = fs.readFileSync(LOCAL_FILE, "utf8");
     allTexts.push(text);
-    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE));
+    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE), ARTIST_NAME);
     allRecords.push(...records);
     allAliases.push(...aliases);
     console.log(`  Found ${records.length} candidate records\n`);
@@ -518,7 +611,7 @@ async function main() {
           continue;
         }
         allTexts.push(text);
-        const { records, aliases } = await mineText(text, title);
+        const { records, aliases } = await mineText(text, title, ARTIST_NAME);
         allRecords.push(...records);
         allAliases.push(...aliases);
         console.log(`+${records.length} records`);
