@@ -34,6 +34,7 @@ await pool.query(`
     risk_flag         TEXT DEFAULT 'low',
     sensitivity_tag   TEXT,
     display_label     TEXT,
+    short_anchor      TEXT,          -- context cue for matching (non-lyric)
     notes             TEXT,
     owner             TEXT,
     last_reviewed_at  TEXT,
