@@ -167,18 +167,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         weights: isCustom ? rawWeights! : undefined,
       });
 
-      // ── CID v5.4 bonus signals (async, additive, non-breaking) ────────────
+      // ── CID v5.4 full scoring — 4 layers, all additive, non-breaking ─────
       try {
         const lineCount = effectiveVerse.split('\n').filter(l => l.trim()).length;
         const cidSignals = await scoreCIDSignals(effectiveVerse, lineCount);
-        if (cidSignals.aliasMatches > 0 || cidSignals.entendreMatches > 0 || cidSignals.punchlineMatches > 0) {
-          // Additive bonus: up to +8 wordplay, +5 punchlines — weighted, capped
-          const wordplayBonus = Math.min(8, cidSignals.culturalReferenceDensity * 5 + cidSignals.entendreScore * 6);
-          const punchBonus    = Math.min(5, cidSignals.punchlinePatternScore * 8);
-          result.scores.wordplay  = Math.min(100, result.scores.wordplay  + wordplayBonus);
+
+        const hasCIDSignal =
+          cidSignals.canonicalMatches > 0 ||
+          cidSignals.aliasMatches     > 0 ||
+          cidSignals.entendreMatches  > 0 ||
+          cidSignals.semanticCooccurrences > 0;
+
+        if (hasCIDSignal) {
+          // ── Wordplay bonus (max +10) ─────────────────────────────────────
+          // Layer 1+2: cultural reference density   → up to +5
+          // Layer 3:   entendre score               → up to +4
+          // Layer 4:   semantic co-occurrence        → up to +3  (bonus on top)
+          // Hard cap: 10 pts, never pushes wordplay above 100
+          const wordplayBonus = Math.min(10,
+            cidSignals.culturalReferenceDensity * 5 +
+            cidSignals.entendreScore            * 4 +
+            cidSignals.semanticScore            * 3
+          );
+
+          // ── Punchlines bonus (max +6) ─────────────────────────────────────
+          // Layer 3b: punchline pattern score       → up to +5
+          // Layer 4:  semantic co-occurrence bonus  → up to +2 extra
+          const punchBonus = Math.min(6,
+            cidSignals.punchlinePatternScore * 5 +
+            cidSignals.semanticScore         * 2
+          );
+
+          result.scores.wordplay   = Math.min(100, result.scores.wordplay   + wordplayBonus);
           result.scores.punchlines = Math.min(100, result.scores.punchlines + punchBonus);
-          // Recalculate overall with updated scores
-          const w = isCustom ? result.customWeights! : { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
+
+          // Recalculate overall with v4.1 weights
+          const w = isCustom
+            ? result.customWeights!
+            : { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
           result.scores.overall = Math.min(100,
             result.scores.flow         * (w as any).flow +
             result.scores.rhyming      * (w as any).rhyming +
@@ -186,13 +212,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             result.scores.storytelling * (w as any).storytelling +
             result.scores.punchlines   * (w as any).punchlines
           );
+
           // Append CID evidence to explanation
           if (cidSignals.evidence.length > 0) {
             result.explanation += ' ' + cidSignals.evidence.join(' ');
           }
         }
       } catch (cidErr) {
-        // CID failure is always non-fatal
+        // CID failure is always non-fatal — base scoring unaffected
         console.error('CID scoring error (non-fatal):', cidErr);
       }
 
