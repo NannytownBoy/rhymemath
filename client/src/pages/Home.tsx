@@ -409,17 +409,17 @@ export default function Home() {
                   value={verseA} onChange={e => setVerseA(e.target.value)} />
                 {verseA.trim() ? (
                   <div style={{ marginTop: "3px" }}>
-                    <span className="rm-label" style={{ color: linesA >= 16 ? "#006600" : linesA >= 8 ? "#996600" : "#cc0000" }}>
-                      {linesA >= 16 ? "✓" : linesA >= 8 ? "⚠" : "✗"} {linesA} lines · ~{wordsA} words{verseLabelA && ` · ${verseLabelA}`}
+                    <span className="rm-label" style={{ color: linesA >= 8 ? "#006600" : linesA >= 4 ? "#996600" : "#cc0000" }}>
+                      {linesA >= 8 ? "✓" : linesA >= 4 ? "⚠" : "✗"} {linesA} lines · ~{wordsA} words{verseLabelA && ` · ${verseLabelA}`}
                     </span>
-                    {linesA < 8 && (
+                    {linesA < 4 && (
                       <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
-                        Too short for accurate scoring — storytelling requires 8+ lines.
+                        Too short — paste at least 8 bars for accurate scoring.
                       </span>
                     )}
-                    {linesA >= 8 && linesA < 16 && (
+                    {linesA >= 4 && linesA < 8 && (
                       <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
-                        For best results, paste 16+ lines. Short verses score lower on storytelling.
+                        Partial verse detected. 8+ bars recommended for full scoring.
                       </span>
                     )}
                   </div>
@@ -496,17 +496,17 @@ export default function Home() {
                     value={verseB} onChange={e => setVerseB(e.target.value)} />
                   {verseB.trim() ? (
                     <div style={{ marginTop: "3px" }}>
-                      <span className="rm-label" style={{ color: linesB >= 16 ? "#006600" : linesB >= 8 ? "#996600" : "#cc0000" }}>
-                        {linesB >= 16 ? "✓" : linesB >= 8 ? "⚠" : "✗"} {linesB} lines · ~{wordsB} words{verseLabelB && ` · ${verseLabelB}`}
+                      <span className="rm-label" style={{ color: linesB >= 8 ? "#006600" : linesB >= 4 ? "#996600" : "#cc0000" }}>
+                        {linesB >= 8 ? "✓" : linesB >= 4 ? "⚠" : "✗"} {linesB} lines · ~{wordsB} words{verseLabelB && ` · ${verseLabelB}`}
                       </span>
-                      {linesB < 8 && (
+                      {linesB < 4 && (
                         <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
-                          Too short for accurate scoring — storytelling requires 8+ lines.
+                          Too short — paste at least 8 bars for accurate scoring.
                         </span>
                       )}
-                      {linesB >= 8 && linesB < 16 && (
+                      {linesB >= 4 && linesB < 8 && (
                         <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
-                          For best results, paste 16+ lines. Short verses score lower on storytelling.
+                          Partial verse detected. 8+ bars recommended for full scoring.
                         </span>
                       )}
                     </div>

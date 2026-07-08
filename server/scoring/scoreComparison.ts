@@ -537,13 +537,12 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   // Floor at 0.4 so abstract/philosophical verses (low named-ref density) aren't penalized
   const cohesionScale = Math.max(0.4, cohesion);
 
-  // Short verse adjustment: verses under 14 lines can't demonstrate full narrative arc
-  // by definition — don't penalize them as heavily on storytelling-specific signals.
-  // Instead, raise the floor proportionally so a 12-line verse isn't judged like a 32-line epic.
-  const shortVerseFloor = analysis.lineCount < 8 ? 38
-    : analysis.lineCount < 12 ? 42
-    : analysis.lineCount < 16 ? 46
-    : 32; // standard floor for full verses
+  // Short verse adjustment: 8-16 bars IS a complete verse in hip-hop — don't penalize it.
+  // Only fragments (under 8 lines) get a raised floor to compensate for missing arc room.
+  // 8+ lines = full verse, standard floor applies.
+  const shortVerseFloor = analysis.lineCount < 4 ? 44  // hook/fragment — very generous floor
+    : analysis.lineCount < 8 ? 40                       // partial verse — moderate lift
+    : 32;                                               // 8+ lines = complete verse, standard floor
 
   // Calibrated so Nas/Verbal Intercourse (scene=11, thematic=10+, polyDict=13) → Story≈62
   // Winter Warz (scene=12, thematic=7, cohesion≈0.1) → Story≈48-52 (stream-of-consciousness)
