@@ -315,12 +315,34 @@ async function searchArtist(name) {
 }
 
 async function getArtistSongs(artistId, perPage = 20) {
-  const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}&page=1`);
-  const songs = res.response?.songs || [];
-  if (!songs.length) {
-    console.warn(`  [debug] API status: ${res.meta?.status}, response keys: ${Object.keys(res.response || {}).join(", ")}`);
+  // Fetch extra songs to account for filtering out features/collabs
+  const fetchCount = Math.min(perPage * 3, 50);
+  let page = 1;
+  let collected = [];
+
+  while (collected.length < perPage) {
+    const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=20&page=${page}`);
+    const songs = res.response?.songs || [];
+    if (!songs.length) break;
+
+    // Prefer songs where the target artist is a primary artist
+    for (const song of songs) {
+      const isPrimary = (song.primary_artists || []).some(a => a.id === artistId)
+        || song.primary_artist?.id === artistId;
+      if (isPrimary) collected.push(song);
+      if (collected.length >= perPage) break;
+    }
+    page++;
+    if (page > 5) break; // max 5 pages
   }
-  return songs;
+
+  // Fallback: if strict filter got nothing, return all songs from page 1
+  if (!collected.length) {
+    const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}&page=1`);
+    return res.response?.songs || [];
+  }
+
+  return collected;
 }
 
 async function getSongById(songId) {
