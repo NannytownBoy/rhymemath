@@ -138,12 +138,13 @@ const args = process.argv.slice(2);
 const getArg = (flag) => { const i = args.indexOf(flag); return i !== -1 ? args[i + 1] : null; };
 const hasFlag = (flag) => args.includes(flag);
 
-const GENIUS_TOKEN = process.env.GENIUS_TOKEN;
-const ARTIST_NAME  = getArg("--artist");
-const SONG_URL     = getArg("--url");
-const LOCAL_FILE   = getArg("--file");
-const SONG_COUNT   = parseInt(getArg("--songs") || "10", 10);
-const OUT_DIR      = getArg("--outdir") || process.cwd();
+const GENIUS_TOKEN  = process.env.GENIUS_TOKEN;
+const ARTIST_NAME   = getArg("--artist");
+const ARTIST_ID_ARG = getArg("--artist-id");  // bypass search, use known Genius ID directly
+const SONG_URL      = getArg("--url");
+const LOCAL_FILE    = getArg("--file");
+const SONG_COUNT    = parseInt(getArg("--songs") || "10", 10);
+const OUT_DIR       = getArg("--outdir") || process.cwd();
 
 if (!ARTIST_NAME) {
   console.error("Usage: GENIUS_TOKEN=... node scripts/lyric-miner.mjs --artist \"Ghostface Killah\" [--songs 10] [--url ...] [--file ...] [--outdir ...]");
@@ -329,7 +330,13 @@ async function searchArtist(name) {
 
 async function getArtistSongs(artistId, perPage = 20) {
   const res = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}`);
-  return res.response?.songs || [];
+  const songs = res.response?.songs || [];
+  if (!songs.length) {
+    // Some artists require page-based pagination fallback
+    const res2 = await geniusGet(`/artists/${artistId}/songs?sort=popularity&per_page=${perPage}&page=1`);
+    return res2.response?.songs || [];
+  }
+  return songs;
 }
 
 async function getSongById(songId) {
@@ -641,10 +648,16 @@ async function main() {
       const song = await getSongByUrl(SONG_URL);
       if (song) songs = [song];
     } else {
-      console.log(`Searching Genius for artist: ${ARTIST_NAME}...`);
-      const artistId = await searchArtist(ARTIST_NAME);
-      if (!artistId) { console.error("Artist not found on Genius."); process.exit(1); }
-      console.log(`Found artist ID: ${artistId}`);
+      let artistId;
+      if (ARTIST_ID_ARG) {
+        artistId = parseInt(ARTIST_ID_ARG, 10);
+        console.log(`Using provided artist ID: ${artistId}`);
+      } else {
+        console.log(`Searching Genius for artist: ${ARTIST_NAME}...`);
+        artistId = await searchArtist(ARTIST_NAME);
+        if (!artistId) { console.error("Artist not found on Genius."); process.exit(1); }
+        console.log(`Found artist ID: ${artistId}`);
+      }
       songs = await getArtistSongs(artistId, SONG_COUNT);
       console.log(`Found ${songs.length} songs\n`);
     }
