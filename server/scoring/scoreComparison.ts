@@ -537,6 +537,14 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   // Floor at 0.4 so abstract/philosophical verses (low named-ref density) aren't penalized
   const cohesionScale = Math.max(0.4, cohesion);
 
+  // Short verse adjustment: verses under 14 lines can't demonstrate full narrative arc
+  // by definition — don't penalize them as heavily on storytelling-specific signals.
+  // Instead, raise the floor proportionally so a 12-line verse isn't judged like a 32-line epic.
+  const shortVerseFloor = analysis.lineCount < 8 ? 38
+    : analysis.lineCount < 12 ? 42
+    : analysis.lineCount < 16 ? 46
+    : 32; // standard floor for full verses
+
   // Calibrated so Nas/Verbal Intercourse (scene=11, thematic=10+, polyDict=13) → Story≈62
   // Winter Warz (scene=12, thematic=7, cohesion≈0.1) → Story≈48-52 (stream-of-consciousness)
   const raw =
@@ -549,7 +557,7 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
     characterScore * 0.07 +
     polyDictScore * 0.12 +
     soundArchScore * 0.05 +
-    32;                                      // base floor
+    shortVerseFloor;                         // adaptive floor based on verse length
 
   const score = clamp(Math.round(raw));
 

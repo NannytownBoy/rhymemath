@@ -407,10 +407,25 @@ export default function Home() {
                   style={{ width: "100%", height: "150px", resize: "vertical", lineHeight: "1.6" }}
                   placeholder={"Paste the verse here for full scoring...\nNo verse = name-based scoring only."}
                   value={verseA} onChange={e => setVerseA(e.target.value)} />
-                {verseA.trim()
-                  ? <div className="rm-label" style={{ marginTop: "3px", color: "#006600" }}>✓ {linesA} lines · ~{wordsA} words{verseLabelA && ` · ${verseLabelA}`}</div>
-                  : <div className="rm-label" style={{ marginTop: "3px", color: "#888" }}>No verse — name-based scoring only</div>
-                }
+                {verseA.trim() ? (
+                  <div style={{ marginTop: "3px" }}>
+                    <span className="rm-label" style={{ color: linesA >= 16 ? "#006600" : linesA >= 8 ? "#996600" : "#cc0000" }}>
+                      {linesA >= 16 ? "✓" : linesA >= 8 ? "⚠" : "✗"} {linesA} lines · ~{wordsA} words{verseLabelA && ` · ${verseLabelA}`}
+                    </span>
+                    {linesA < 8 && (
+                      <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
+                        Too short for accurate scoring — storytelling requires 8+ lines.
+                      </span>
+                    )}
+                    {linesA >= 8 && linesA < 16 && (
+                      <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
+                        For best results, paste 16+ lines. Short verses score lower on storytelling.
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rm-label" style={{ marginTop: "3px", color: "#888" }}>No verse — name-based scoring only</div>
+                )}
               </div>
             </div>
           </div>
@@ -479,10 +494,25 @@ export default function Home() {
                     style={{ width: "100%", height: "150px", resize: "vertical", lineHeight: "1.6" }}
                     placeholder={"Paste the verse here for full scoring...\nNo verse = name-based scoring only."}
                     value={verseB} onChange={e => setVerseB(e.target.value)} />
-                  {verseB.trim()
-                    ? <div className="rm-label" style={{ marginTop: "3px", color: "#006600" }}>✓ {linesB} lines · ~{wordsB} words{verseLabelB && ` · ${verseLabelB}`}</div>
-                    : <div className="rm-label" style={{ marginTop: "3px", color: "#888" }}>No verse — name-based scoring only</div>
-                  }
+                  {verseB.trim() ? (
+                    <div style={{ marginTop: "3px" }}>
+                      <span className="rm-label" style={{ color: linesB >= 16 ? "#006600" : linesB >= 8 ? "#996600" : "#cc0000" }}>
+                        {linesB >= 16 ? "✓" : linesB >= 8 ? "⚠" : "✗"} {linesB} lines · ~{wordsB} words{verseLabelB && ` · ${verseLabelB}`}
+                      </span>
+                      {linesB < 8 && (
+                        <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
+                          Too short for accurate scoring — storytelling requires 8+ lines.
+                        </span>
+                      )}
+                      {linesB >= 8 && linesB < 16 && (
+                        <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
+                          For best results, paste 16+ lines. Short verses score lower on storytelling.
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rm-label" style={{ marginTop: "3px", color: "#888" }}>No verse — name-based scoring only</div>
+                  )}
                 </div>
               </div>
             </div>

@@ -18,7 +18,7 @@
  *   DATABASE_URL="postgresql://..." node scripts/cid-rescore.mjs
  *   DATABASE_URL="postgresql://..." node scripts/cid-rescore.mjs --force
  *
- * --force reprocesses rows already at v4.1 (needed after new CID imports).
+ * --force reprocesses rows already at v4.2 (needed after new CID imports).
  * ───────────────────────────────────────────────────────────────────
  */
 
@@ -26,7 +26,7 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-const SCORING_VERSION = "v4.1";
+const SCORING_VERSION = "v4.2";
 const WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
 const FORCE = process.argv.includes("--force");
 
