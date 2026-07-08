@@ -8,7 +8,7 @@ import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
 
 // ── Scoring version — bump when formula changes significantly ─────────────────
-const SCORING_VERSION = "v4";
+const SCORING_VERSION = "v4.1";
 
 // ── Title-case helper for artist names and song titles ────────────────────────
 function toTitleCase(s: string): string {
@@ -596,7 +596,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // -- Battle comparisons: use DB columns for names/winner, JSON for category scores --
       for (const c of allComparisons) {
         const cMode = c.scoringMode ?? "standard";
-        if (cMode !== "standard" && cMode !== `standard-${SCORING_VERSION}`) continue;
+        if (cMode !== "standard" && !cMode.startsWith("standard-v4")) continue;
         let aScores: any = null;
         let bScores: any = null;
         try {
@@ -615,7 +615,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // -- Solo analyses: use stored score columns --
       for (const a of allAnalyses) {
         const aMode = a.scoringMode ?? "standard";
-        if (aMode !== "standard" && aMode !== `standard-${SCORING_VERSION}`) continue;
+        if (aMode !== "standard" && !aMode.startsWith("standard-v4")) continue;
         const ts = typeof a.createdAt === "number" ? a.createdAt : Date.parse(a.createdAt as any);
         upsert(a.artistName, {
           overall: a.scoreOverall,
