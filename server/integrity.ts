@@ -53,6 +53,31 @@ const MISLABELED_ENTRIES: Array<{ artist: string; song: string; reason: string }
   },
 ];
 
+/**
+ * Artist name casing corrections — applied every 30 min.
+ * Key: what's stored (lowercased for matching), Value: correct form.
+ */
+const ARTIST_CASING_CORRECTIONS: Record<string, string> = {
+  "jid":         "JID",
+  "mach-hommy":  "Mach-Hommy",
+  "dmx":         "DMX",
+  "az":          "AZ",
+  "rza":         "RZA",
+  "gza":         "GZA",
+  "mf doom":     "MF DOOM",
+  "krs-one":     "KRS-One",
+  "big l":       "Big L",
+  "big pun":     "Big Pun",
+  "big daddy kane": "Big Daddy Kane",
+  "el-p":        "El-P",
+  "ab-soul":     "Ab-Soul",
+  "jay electronica": "Jay Electronica",
+  "j. cole":     "J. Cole",
+  "j cole":      "J. Cole",
+  "posdnous":    "Posdnuos",
+  "yasiin bey (fka mos def)": "Yasiin Bey (fka Mos Def)",
+};
+
 // ─── Core Check Function ───────────────────────────────────────────────────────
 
 export interface IntegrityReport {
@@ -195,6 +220,24 @@ export async function runIntegrityCheck(): Promise<IntegrityReport> {
     [...ARTIST_NAME_BLOCKLIST, ...ARTIST_NAME_BLOCKLIST],
   );
   report.comparisons.bad_artist_name_removed = r8.rowCount ?? 0;
+
+  // ── 9. Normalize artist name casing ───────────────────────────────────────
+  for (const [storedLower, correctForm] of Object.entries(ARTIST_CASING_CORRECTIONS)) {
+    // Fix in analyses
+    await pool.query(
+      `UPDATE analyses SET artist_name = $1 WHERE LOWER(TRIM(artist_name)) = $2 AND artist_name != $1`,
+      [correctForm, storedLower]
+    );
+    // Fix in comparisons (both sides)
+    await pool.query(
+      `UPDATE comparisons SET artist_a_name = $1 WHERE LOWER(TRIM(artist_a_name)) = $2 AND artist_a_name != $1`,
+      [correctForm, storedLower]
+    );
+    await pool.query(
+      `UPDATE comparisons SET artist_b_name = $1 WHERE LOWER(TRIM(artist_b_name)) = $2 AND artist_b_name != $1`,
+      [correctForm, storedLower]
+    );
+  }
 
   // ── Totals ────────────────────────────────────────────────────────────────
   report.total_removed =
