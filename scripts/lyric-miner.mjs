@@ -441,11 +441,15 @@ async function getArtistSongs(artistId, perPage = 20) {
     const songs = res.response?.songs || [];
     if (!songs.length) break;
 
-    // Prefer songs where the target artist is a primary artist
+    // Only keep songs where the target artist is THE primary artist (not just a feature/sample)
     for (const song of songs) {
-      const isPrimary = (song.primary_artists || []).some(a => a.id === artistId)
-        || song.primary_artist?.id === artistId;
-      if (isPrimary) collected.push(song);
+      const primaryId = song.primary_artist?.id;
+      const allPrimaryIds = (song.primary_artists || []).map(a => a.id);
+      // Strict: must be the sole or a co-primary artist, not just tagged
+      const isPrimary = primaryId === artistId || allPrimaryIds.includes(artistId);
+      // Extra guard: if primary_artist is someone else entirely, skip
+      const someoneElseIsPrimary = primaryId && primaryId !== artistId && !allPrimaryIds.includes(artistId);
+      if (isPrimary && !someoneElseIsPrimary) collected.push(song);
       if (collected.length >= perPage) break;
     }
     page++;
