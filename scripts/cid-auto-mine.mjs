@@ -155,6 +155,9 @@ function runMiner(artistName, songCount, outDir) {
     ...process.env,
     GENIUS_TOKEN: process.env.GENIUS_TOKEN,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+    // API_BASE tells the miner where to send scoring requests
+    // Falls back to Railway production URL if not explicitly set
+    API_BASE: process.env.API_BASE || "https://rhymemath-production.up.railway.app",
   };
 
   const cmd = [
@@ -162,10 +165,12 @@ function runMiner(artistName, songCount, outDir) {
     "--artist", `"${artistName}"`,
     "--songs", String(songCount),
     "--outdir", `"${outDir}"`,
+    "--analyze",  // score and write every verse to analyses table
   ].join(" ");
 
   try {
-    const output = execSync(cmd, { env, encoding: "utf8", timeout: 120000 });
+    // Increase timeout — scoring adds ~2s per song
+    const output = execSync(cmd, { env, encoding: "utf8", timeout: 300000 });
     return { success: true, output };
   } catch (e) {
     return { success: false, output: e.message };
