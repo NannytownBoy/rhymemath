@@ -178,6 +178,34 @@ await pool.query(`
 `);
 
 console.log('✅  All CID v5.4 tables created (or already exist).');
-console.log('   Tables: cid_cultural_records, cid_aliases, cid_semantic_relationships,');
-console.log('           cid_entendre_candidates, cid_punchline_patterns, cid_candidate_queue, cid_sync_log');
+
+// ── v5 analyses schema upgrades ─────────────────────────────────────────────
+await pool.query(`
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS section_label  TEXT;
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS section_index  INTEGER;
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS text_hash      TEXT;
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS source         TEXT DEFAULT 'manual';
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS source_id      TEXT;
+  ALTER TABLE analyses ADD COLUMN IF NOT EXISTS updated_at     INTEGER;
+`);
+
+// Index for fast duplicate detection
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_analyses_text_hash ON analyses(text_hash);
+  CREATE INDEX IF NOT EXISTS idx_analyses_artist ON analyses(artist_name);
+  CREATE INDEX IF NOT EXISTS idx_analyses_source_id ON analyses(source_id);
+`);
+
+// ── cid_sync_log v5 columns (idempotent) ────────────────────────────────────
+await pool.query(`
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS sync_type    TEXT DEFAULT 'manual';
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS source_ref   TEXT;
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS records_added INTEGER DEFAULT 0;
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS status        TEXT DEFAULT 'complete';
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS started_at    TIMESTAMPTZ;
+  ALTER TABLE cid_sync_log ADD COLUMN IF NOT EXISTS completed_at  TIMESTAMPTZ;
+`);
+
+console.log('✅  v5 analyses columns added: section_label, section_index, text_hash, source, source_id, updated_at');
+console.log('   Indexes: idx_analyses_text_hash, idx_analyses_artist, idx_analyses_source_id');
 await pool.end();

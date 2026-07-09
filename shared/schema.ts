@@ -170,6 +170,14 @@ export const analyses = pgTable("analyses", {
   artistName: text("artist_name").notNull(),
   songName: text("song_name").notNull(),
   verseLabel: text("verse_label"),
+  // v5: section identity
+  sectionLabel: text("section_label"),   // canonical: verse_1|verse_2|hook|bridge|outro|unknown
+  sectionIndex: integer("section_index"), // numeric index when known (verse_1=1, verse_2=2, etc.)
+  // v5: deduplication
+  textHash: text("text_hash"),           // SHA-256 of normalized verse text
+  // v5: provenance
+  source: text("source"),                // "genius"|"manual"|"miner"
+  sourceId: text("source_id"),           // Genius song ID or other external ref
   verse: text("verse").notNull(),
   scoringMode: text("scoring_mode").notNull().default("standard"),
   customWeights: text("custom_weights"),
@@ -182,6 +190,7 @@ export const analyses = pgTable("analyses", {
   scoreRhyming: real("score_rhyming").notNull(),
   scorePunchlines: real("score_punchlines").notNull(),
   createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at"),
 });
 
 export const insertAnalysisSchema = createInsertSchema(analyses).omit({ id: true });

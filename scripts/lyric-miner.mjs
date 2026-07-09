@@ -40,6 +40,9 @@
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
+import pg from "pg";
+const { Pool } = pg;
 
 // ── AI enrichment via OpenAI (optional — set OPENAI_API_KEY to enable) ────────
 const AI_ENABLED = !!process.env.OPENAI_API_KEY;
@@ -133,6 +136,10 @@ const SONG_URL      = getArg("--url");
 const LOCAL_FILE    = getArg("--file");
 const SONG_COUNT    = parseInt(getArg("--songs") || "10", 10);
 const OUT_DIR       = getArg("--outdir") || process.cwd();
+const ANALYZE       = hasFlag("--analyze"); // write scored analyses directly to DB
+const DRY_RUN       = hasFlag("--dry-run");
+const DATABASE_URL  = process.env.DATABASE_URL;
+const API_BASE      = process.env.API_BASE || "http://localhost:5000";
 
 if (!ARTIST_NAME) {
   console.error("Usage: GENIUS_TOKEN=... node scripts/lyric-miner.mjs --artist \"Ghostface Killah\" [--songs 10] [--url ...] [--file ...] [--outdir ...]");
@@ -235,6 +242,115 @@ const COMMON_WORDS = new Set([
   "way","day","back","look","give","use","work","first","long","last","never",
   "always","still","even","well","also","now","right","down","thing","things",
 ]);
+
+// ── Section detection (for analyze-and-store) ───────────────────────────────
+const SECTION_PATTERNS = [
+  { re: /^\[?verse\s*1\]?/i, label: "verse_1", index: 1 },
+  { re: /^\[?verse\s*2\]?/i, label: "verse_2", index: 2 },
+  { re: /^\[?verse\s*3\]?/i, label: "verse_3", index: 3 },
+  { re: /^\[?verse\s*4\]?/i, label: "verse_4", index: 4 },
+  { re: /^\[?verse\]?/i,     label: "verse_1", index: 1 },
+  { re: /^\[?(?:hook|chorus)\]?/i, label: "hook", index: null },
+  { re: /^\[?bridge\]?/i,    label: "bridge", index: null },
+  { re: /^\[?intro\]?/i,     label: "intro",  index: null },
+  { re: /^\[?outro\]?/i,     label: "outro",  index: null },
+  { re: /^\[?interlude\]?/i, label: "interlude", index: null },
+  { re: /^\[?pre[\s-]?(?:hook|chorus)\]?/i, label: "pre_hook", index: null },
+];
+
+function splitLyricsIntoSections(rawLyrics) {
+  const lines = rawLyrics.split(/\r?\n/);
+  const sections = [];
+  let current = null;
+  let autoIdx = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    let header = null;
+    for (const { re, label, index } of SECTION_PATTERNS) {
+      if (re.test(trimmed)) { header = { label, index }; break; }
+    }
+    if (header) {
+      if (current && current.lines.filter(l => l.trim()).length > 0) sections.push(current);
+      current = { label: header.label, index: header.index, lines: [] };
+    } else if (trimmed) {
+      if (!current) { autoIdx++; current = { label: `verse_${autoIdx}`, index: autoIdx, lines: [] }; }
+      current.lines.push(line);
+    }
+  }
+  if (current && current.lines.filter(l => l.trim()).length > 0) sections.push(current);
+  if (!sections.length && rawLyrics.trim()) {
+    sections.push({ label: "unknown", index: null, lines: rawLyrics.split(/\r?\n/).filter(l => l.trim()) });
+  }
+  return sections
+    .map(s => ({ ...s, text: s.lines.filter(l => l.trim()).join("\n") }))
+    .filter(s => s.text.length > 10 && s.lines.filter(l => l.trim()).length >= 2);
+}
+
+function hashVerse(text) {
+  const normalized = text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+  return crypto.createHash("sha256").update(normalized).digest("hex");
+}
+
+async function analyzeAndStoreInline({ artist, title, lyrics, source, sourceId, dryRun }) {
+  if (!DATABASE_URL) return [];
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  const sections = splitLyricsIntoSections(lyrics);
+  const results = [];
+
+  for (const { label, index, text } of sections) {
+    const hash = hashVerse(text);
+
+    // Duplicate check
+    const dup = await pool.query("SELECT id FROM analyses WHERE text_hash = $1 LIMIT 1", [hash]);
+    if (dup.rows.length > 0) { results.push({ status: "skip", label }); continue; }
+
+    // Score via local API
+    let scored = null;
+    try {
+      const res = await fetch(`${API_BASE}/api/solo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artistName: artist, songTitle: title, verse: text, verseLabel: label, save: false }),
+      });
+      if (res.ok) scored = await res.json();
+    } catch (_) {}
+
+    if (!scored) { results.push({ status: "flag", label }); continue; }
+    if (dryRun) { results.push({ status: "dry-run", label, score: scored.scoreOverall }); continue; }
+
+    const resultId = `genius-${sourceId || "manual"}-${label}-${hash.slice(0, 8)}`;
+    const now = Math.floor(Date.now() / 1000);
+    try {
+      await pool.query(`
+        INSERT INTO analyses (
+          result_id, artist_name, song_name, verse_label,
+          section_label, section_index, text_hash, source, source_id, verse,
+          scoring_mode, result_json,
+          score_overall, score_flow, score_wordplay, score_storytelling, score_rhyming, score_punchlines,
+          created_at, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19)
+        ON CONFLICT (result_id) DO UPDATE SET
+          score_overall=EXCLUDED.score_overall, score_flow=EXCLUDED.score_flow,
+          score_wordplay=EXCLUDED.score_wordplay, score_storytelling=EXCLUDED.score_storytelling,
+          score_rhyming=EXCLUDED.score_rhyming, score_punchlines=EXCLUDED.score_punchlines,
+          result_json=EXCLUDED.result_json, updated_at=EXCLUDED.updated_at
+      `, [
+        resultId, artist, title, label, label, index, hash,
+        source, sourceId ? String(sourceId) : null, text,
+        "standard-v5.0", JSON.stringify(scored),
+        scored.scoreOverall||0, scored.scoreFlow||0, scored.scoreWordplay||0,
+        scored.scoreStorytelling||0, scored.scoreRhyming||0, scored.scorePunchlines||0, now
+      ]);
+      results.push({ status: "insert", label, score: scored.scoreOverall });
+    } catch (err) {
+      results.push({ status: "error", label, reason: err.message });
+    }
+  }
+
+  await pool.end();
+  return results;
+}
 
 // ── Genius API helpers ────────────────────────────────────────────────────────
 
@@ -677,7 +793,24 @@ async function main() {
         const { records, aliases } = await mineText(text, title, ARTIST_NAME);
         allRecords.push(...records);
         allAliases.push(...aliases);
-        console.log(`+${records.length} records`);
+        process.stdout.write(`+${records.length} records`);
+
+        // ── Analyze-and-store (opt-in via --analyze flag) ──────────────────
+        if (ANALYZE && DATABASE_URL) {
+          const stored = await analyzeAndStoreInline({
+            artist: ARTIST_NAME,
+            title: song.title || title,
+            lyrics: text,
+            source: "genius",
+            sourceId: String(song.id || ""),
+            dryRun: DRY_RUN,
+          });
+          const ins = stored.filter(r => r.status === "insert").length;
+          const skip = stored.filter(r => r.status === "skip").length;
+          process.stdout.write(` | stored:${ins} dup:${skip}`);
+        }
+
+        console.log("");
         // Small delay to be respectful of Genius rate limits
         await new Promise(r => setTimeout(r, 800));
       } catch (e) {

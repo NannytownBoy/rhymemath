@@ -121,7 +121,7 @@ export default function About() {
           </table>
           <div style={{ padding: "8px 14px 10px 14px", borderTop: "1px solid #e8e8e8", background: "#fafafa" }}>
             <span style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: "#666" }}>
-              Scoring engine: <strong>v4.2</strong>. Future updates tracked as v4.3, v4.4, etc. Major formula changes increment the major version (v5, v6).
+              Scoring engine: <strong>v5.0</strong>. Updates tracked as v5.1, v5.2, etc. Major formula changes increment the major version (v6).
             </span>
           </div>
         </div>

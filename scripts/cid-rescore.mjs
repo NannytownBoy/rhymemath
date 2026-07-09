@@ -26,7 +26,7 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-const SCORING_VERSION = "v4.2";
+const SCORING_VERSION = "v5.0";
 const WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
 const FORCE = process.argv.includes("--force");
 
