@@ -832,7 +832,131 @@ async function mineText(text, songTitle, artistName) {
     records.push(rec);
   }
 
-  return { records, aliases };
+  // ── AI entendre + punchline extraction (same song text, zero extra API cost) ──
+  const { entendres, punchlines } = await extractWordplayFromText(text, songTitle, artistName || "this artist");
+
+  return { records, aliases, entendres, punchlines };
+}
+
+// ── Entendre + punchline extractor (one AI call per song) ────────────────────
+let entendreCounter = 1000;
+let punchlineCounter = 1000;
+function newEntendreId() { return `ENT_M${String(entendreCounter++).padStart(5, "0")}`; }
+function newPunchlineId() { return `PCH_M${String(punchlineCounter++).padStart(5, "0")}`; }
+
+async function extractWordplayFromText(text, songTitle, artistName) {
+  if (!AI_ENABLED || !text || text.length < 50) return { entendres: [], punchlines: [] };
+
+  // Truncate to ~2000 chars — enough for the AI to find wordplay without burning tokens
+  const snippet = text.slice(0, 2000);
+
+  const prompt = `You are a hip-hop linguistics analyst for a music intelligence system called RhymeMath.
+
+Song: "${songTitle}" by ${artistName}
+
+Analyze these lyrics for:
+1. DOUBLE/TRIPLE MEANINGS — words or phrases that carry 2+ simultaneous meanings (entendres)
+2. PUNCHLINES — setup→payoff structures where one line pays off another
+
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "entendres": [
+    {
+      "term": "the word or short phrase with multiple meanings",
+      "anchor": "the full line or fragment it appears in",
+      "interpretation_1": "first meaning",
+      "interpretation_2": "second meaning",
+      "interpretation_3": "third meaning if any, else empty string",
+      "domains": "comma-separated: money;luxury;violence;slang;sports;place;music_industry;street;body;food;automotive;spiritual;philosophy",
+      "strength_estimate": integer 1-5,
+      "confidence": integer 3-5
+    }
+  ],
+  "punchlines": [
+    {
+      "setup_anchor": "the setup line or phrase",
+      "payoff_anchor": "the payoff line or phrase",
+      "mechanism": "1 sentence — how the wordplay works",
+      "punchline_type": one of: "double_entendre|numeric_flip|status_undercut|contrast_punchline|cultural_reference_payoff|image_compression|character_read|opening_misdirection|luxury_humble_contrast|ethos_contrast|callback_payoff|metaphor_flip",
+      "detected_domains": "comma-separated domain tags",
+      "strength_estimate": integer 1-5,
+      "confidence": integer 3-5
+    }
+  ]
+}
+
+Rules:
+- Only flag REAL double meanings — not everything is an entendre. Quality over quantity.
+- Punchlines need a clear setup AND payoff. Bars that just sound good don't count.
+- If you find nothing, return empty arrays.
+- Max 8 entendres and 6 punchlines per song.
+
+Lyrics:
+${snippet}`;
+
+  try {
+    const res = await openAIPost({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1800,
+    });
+    const content = res.choices?.[0]?.message?.content || "";
+    const clean = content.replace(/```json?/gi, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(clean);
+
+    const entendres = (parsed.entendres || []).map(e => ({
+      entendre_id:      newEntendreId(),
+      anchor:           e.anchor || "",
+      short_anchor:     (e.anchor || "").slice(0, 80),
+      term:             e.term || "",
+      interpretation_1: e.interpretation_1 || "",
+      interpretation_2: e.interpretation_2 || "",
+      interpretation_3: e.interpretation_3 || "",
+      domains:          e.domains || "",
+      strength_estimate: e.strength_estimate || 3,
+      confidence:       e.confidence || 3,
+      category_primary: "double_entendre",
+      review_status:    e.confidence >= 4 ? "approved" : "needs_review",
+      status:           "active",
+      source_id:        SOURCE_ID,
+      risk_flag:        "low",
+      sensitivity_tag:  "contextual",
+      display_label:    e.term || "",
+      notes:            `Extracted from "${songTitle}" by lyric-miner on ${TODAY}`,
+      owner:            "PH Labs Curator",
+      last_reviewed_at: TODAY,
+      approved_by:      e.confidence >= 4 ? "PH Labs Curator" : "",
+    }));
+
+    const punchlines = (parsed.punchlines || []).map(p => ({
+      punchline_id:     newPunchlineId(),
+      setup_anchor:     p.setup_anchor || "",
+      short_anchor:     (p.setup_anchor || "").slice(0, 80),
+      payoff_anchor:    p.payoff_anchor || "",
+      mechanism:        p.mechanism || "",
+      detected_domains: p.detected_domains || "",
+      punchline_type:   p.punchline_type || "contrast_punchline",
+      strength_estimate: p.strength_estimate || 3,
+      confidence:       p.confidence || 3,
+      category_primary: "punchline_context",
+      review_status:    p.confidence >= 4 ? "approved" : "needs_review",
+      status:           "active",
+      source_id:        SOURCE_ID,
+      risk_flag:        "low",
+      sensitivity_tag:  "contextual",
+      display_label:    `${(p.setup_anchor || "").slice(0,40)} → ${(p.payoff_anchor || "").slice(0,40)}`,
+      notes:            `Extracted from "${songTitle}" by lyric-miner on ${TODAY}`,
+      owner:            "PH Labs Curator",
+      last_reviewed_at: TODAY,
+      approved_by:      p.confidence >= 4 ? "PH Labs Curator" : "",
+    }));
+
+    return { entendres, punchlines };
+  } catch (e) {
+    console.warn(`  [AI-wordplay] failed (non-fatal): ${e.message}`);
+    return { entendres: [], punchlines: [] };
+  }
 }
 
 async function main() {
@@ -843,6 +967,8 @@ async function main() {
 
   const allRecords = [];
   const allAliases = [];
+  const allEntendres = [];
+  const allPunchlines = [];
   const allTexts = [];
 
   // ── Source: local file ───────────────────────────────────────────────────
@@ -850,10 +976,12 @@ async function main() {
     console.log(`Reading local file: ${LOCAL_FILE}`);
     const text = fs.readFileSync(LOCAL_FILE, "utf8");
     allTexts.push(text);
-    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE), artist);
+    const { records, aliases, entendres, punchlines } = await mineText(text, path.basename(LOCAL_FILE), artist);
     allRecords.push(...records);
     allAliases.push(...aliases);
-    console.log(`  Found ${records.length} candidate records\n`);
+    allEntendres.push(...entendres);
+    allPunchlines.push(...punchlines);
+    console.log(`  Found ${records.length} candidate records, ${entendres.length} entendres, ${punchlines.length} punchlines\n`);
   }
 
   // ── Source: Genius API ───────────────────────────────────────────────────
@@ -890,10 +1018,12 @@ async function main() {
           continue;
         }
         allTexts.push(text);
-        const { records, aliases } = await mineText(text, title, artist);
+        const { records, aliases, entendres, punchlines } = await mineText(text, title, artist);
         allRecords.push(...records);
         allAliases.push(...aliases);
-        process.stdout.write(`+${records.length} records`);
+        allEntendres.push(...entendres);
+        allPunchlines.push(...punchlines);
+        process.stdout.write(`+${records.length} rec +${entendres.length} ent +${punchlines.length} pch`);
 
         // ── Analyze-and-store (opt-in via --analyze flag) ──────────────────
         if (ANALYZE && DATABASE_URL) {
@@ -945,10 +1075,12 @@ async function main() {
   // ── Write output ─────────────────────────────────────────────────────────
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 
-  const recordsFile = path.join(OUT_DIR, `v5_4_mined_refs.csv`);
-  const aliasesFile = path.join(OUT_DIR, `v5_4_alias_additions.csv`);
+  const recordsFile  = path.join(OUT_DIR, `v5_4_mined_refs.csv`);
+  const aliasesFile  = path.join(OUT_DIR, `v5_4_alias_additions.csv`);
+  const entendresFile = path.join(OUT_DIR, `v5_4_entendres.csv`);
+  const puchlinesFile = path.join(OUT_DIR, `v5_4_punchlines.json`);
 
-  // Deduplicate by term
+  // Deduplicate records by term
   const uniqueRecords = [];
   const seenTerms = new Set();
   for (const r of allRecords) {
@@ -958,12 +1090,16 @@ async function main() {
 
   writeCSV(recordsFile, uniqueRecords);
   writeCSV(aliasesFile, allAliases);
+  if (allEntendres.length) writeCSV(entendresFile, allEntendres);
+  if (allPunchlines.length) fs.writeFileSync(puchlinesFile, JSON.stringify(allPunchlines, null, 2), "utf8");
 
   console.log(`\n─────────────────────────────────────────────────────`);
   console.log(`  Mining complete`);
-  console.log(`  Records found:  ${uniqueRecords.length}`);
-  console.log(`  Aliases found:  ${allAliases.length}`);
-  console.log(`  Output dir:     ${OUT_DIR}`);
+  console.log(`  Records found:   ${uniqueRecords.length}`);
+  console.log(`  Aliases found:   ${allAliases.length}`);
+  console.log(`  Entendres found: ${allEntendres.length}`);
+  console.log(`  Punchlines found:${allPunchlines.length}`);
+  console.log(`  Output dir:      ${OUT_DIR}`);
   console.log(`─────────────────────────────────────────────────────`);
   console.log(`\nNext steps:`);
   console.log(`  1. Review and clean the CSVs (delete bad rows)`);

@@ -129,6 +129,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         weights: isCustom ? rawWeights! : undefined,
       });
 
+      // ── CID boost for both sides of the battle ──────────────────────────
+      try {
+        const linesA = effectiveVerseA.split('\n').filter(l => l.trim()).length;
+        const linesB = effectiveVerseB.split('\n').filter(l => l.trim()).length;
+        const [cidA, cidB] = await Promise.all([
+          scoreCIDSignals(effectiveVerseA, linesA),
+          scoreCIDSignals(effectiveVerseB, linesB),
+        ]);
+        const applyBattleCID = (side: typeof finalResult.artistA, cid: typeof cidA) => {
+          const hasCID = cid.canonicalMatches > 0 || cid.aliasMatches > 0 ||
+                         cid.entendreMatches > 0 || cid.semanticCooccurrences > 0;
+          if (!hasCID) return;
+          const w = isCustom ? rawWeights! as any
+            : { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
+          side.scores.wordplay   = Math.min(100, side.scores.wordplay + Math.min(10,
+            cid.culturalReferenceDensity * 5 + cid.entendreScore * 4 + cid.semanticScore * 3));
+          side.scores.punchlines = Math.min(100, side.scores.punchlines + Math.min(6,
+            cid.punchlinePatternScore * 5 + cid.semanticScore * 2));
+          side.scores.overall = Math.min(100,
+            side.scores.flow * w.flow + side.scores.rhyming * w.rhyming +
+            side.scores.wordplay * w.wordplay + side.scores.storytelling * w.storytelling +
+            side.scores.punchlines * w.punchlines);
+        };
+        applyBattleCID(finalResult.artistA, cidA);
+        applyBattleCID(finalResult.artistB, cidB);
+        // Re-determine winner after CID adjustment
+        finalResult.artistA.scores.overall = Math.round(finalResult.artistA.scores.overall * 10) / 10;
+        finalResult.artistB.scores.overall = Math.round(finalResult.artistB.scores.overall * 10) / 10;
+      } catch (cidErr) {
+        console.error('CID battle scoring error (non-fatal):', cidErr);
+      }
+
       const resultWithMode = {
         ...finalResult,
         scoringMode: isCustom ? "custom" : "standard",
@@ -952,6 +984,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       console.error("[db-health] failed:", err);
       res.status(500).json({ error: "DB health check failed." });
     }
+  });
+
+  // ── POST /api/cid/cache-clear ────────────────────────────────────────────
+  // Called by cid-auto-mine after each successful import so new entendres/punchlines
+  // are picked up without a server restart.
+  app.post("/api/cid/cache-clear", (req, res) => {
+    clearCIDCache();
+    console.log("[CID] Cache cleared by miner — will reload on next score request");
+    res.json({ success: true, message: "CID cache cleared" });
   });
 
 

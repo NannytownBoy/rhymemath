@@ -379,6 +379,13 @@ async function main() {
 
   // Rescore after all imports
   if (!DRY_RUN && totalNewRecords > 0) {
+    // Clear CID cache on Railway so new entendres/punchlines fire immediately
+    try {
+      const apiBase = process.env.API_BASE || "http://localhost:5000";
+      const cacheRes = await fetch(`${apiBase}/api/cid/cache-clear`, { method: 'POST' });
+      console.log(`\nCID cache cleared: ${cacheRes.ok ? 'OK' : 'failed'}`);
+    } catch { console.log('\nCID cache-clear skipped (non-fatal)'); }
+
     console.log(`\nRescoring all analyses with ${totalNewRecords} new CID records...`);
     const rescoreResult = runRescore();
     if (rescoreResult.success) {
