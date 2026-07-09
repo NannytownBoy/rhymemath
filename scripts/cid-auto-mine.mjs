@@ -70,7 +70,6 @@ const APPROVED_ARTISTS = [
   { name: "Young Jeezy",         songs: 8,  priority: 2, artistId: 67, geniusName: "Jeezy" },
 
   // NYC / Jay-Z universe
-  { name: "Jay-Z",               songs: 8,  priority: 1 },
   { name: "Kanye West",          songs: 8,  priority: 1 },
   { name: "Nas",                 songs: 8,  priority: 1 },
   { name: "AZ",                  songs: 8,  priority: 2 },
@@ -93,6 +92,74 @@ const APPROVED_ARTISTS = [
   { name: "Lupe Fiasco",         songs: 8,  priority: 2 },
   { name: "Vince Staples",       songs: 6,  priority: 2 },
   { name: "JID",                 songs: 6,  priority: 2 },
+
+  // ── Wave 2 ────────────────────────────────────────────────────────────────
+
+  // NYC legends (more catalog depth)
+  { name: "Notorious B.I.G.",    songs: 8,  priority: 1, artistId: 10617 },
+  { name: "Jay-Z",               songs: 8,  priority: 1, artistId: 2 },
+  { name: "Eminem",              songs: 8,  priority: 1 },
+  { name: "DMX",                 songs: 8,  priority: 2 },
+  { name: "Jadakiss",            songs: 8,  priority: 2 },
+  { name: "Styles P",            songs: 6,  priority: 2 },
+  { name: "Sheek Louch",         songs: 6,  priority: 3 },
+
+  // Brooklyn underground
+  { name: "Buckshot",            songs: 6,  priority: 3 },
+
+  // West Coast expansion
+  { name: "Snoop Dogg",          songs: 8,  priority: 2 },
+  { name: "Ice Cube",            songs: 8,  priority: 1 },
+  { name: "E-40",                songs: 6,  priority: 3 },
+  { name: "Too $hort",           songs: 6,  priority: 3 },
+  { name: "ScHoolboy Q",         songs: 8,  priority: 2 },
+  { name: "Ab-Soul",             songs: 8,  priority: 2 },
+  { name: "Jay Rock",            songs: 6,  priority: 3 },
+
+  // Houston / Dirty South
+  { name: "UGK",                 songs: 6,  priority: 2 },
+  { name: "Z-Ro",                songs: 6,  priority: 3 },
+  { name: "Scarface",            songs: 8,  priority: 1 },
+  { name: "T.I.",                songs: 8,  priority: 2 },
+  { name: "2 Chainz",            songs: 6,  priority: 3 },
+  { name: "21 Savage",           songs: 6,  priority: 3 },
+
+  // Detroit / Midwest
+  { name: "Royce da 5'9\"",       songs: 8,  priority: 1 },
+  { name: "Big Sean",            songs: 6,  priority: 3 },
+  { name: "Childish Gambino",    songs: 6,  priority: 3 },
+
+  // New school / current
+  { name: "Pusha T",             songs: 8,  priority: 1 },
+  { name: "Freddie Gibbs",       songs: 8,  priority: 1 },
+  { name: "Boldy James",         songs: 6,  priority: 2 },
+  { name: "Ransom",              songs: 6,  priority: 2 },
+  { name: "Roc Marciano",        songs: 6,  priority: 2 },
+  { name: "Ka",                  songs: 6,  priority: 2 },
+  { name: "billy woods",         songs: 6,  priority: 2 },
+  { name: "JPEGMAFIA",           songs: 6,  priority: 3 },
+  { name: "Danny Brown",         songs: 6,  priority: 2 },
+  { name: "Open Mike Eagle",     songs: 6,  priority: 3 },
+  { name: "Oddisee",             songs: 6,  priority: 3 },
+
+  // Golden era / boom bap
+  { name: "KRS-One",             songs: 8,  priority: 1 },
+  { name: "Big Daddy Kane",      songs: 8,  priority: 1 },
+  { name: "Slick Rick",          songs: 8,  priority: 1 },
+  { name: "LL Cool J",           songs: 6,  priority: 2 },
+  { name: "EPMD",                songs: 6,  priority: 2 },
+  { name: "Gang Starr",          songs: 8,  priority: 1 },
+  { name: "Guru",                songs: 6,  priority: 2 },
+  { name: "Common",              songs: 8,  priority: 1 },
+  { name: "Yasiin Bey",          songs: 8,  priority: 1 },
+  { name: "Dead Prez",           songs: 6,  priority: 2 },
+  { name: "Mobb Deep",           songs: 8,  priority: 1 },
+  { name: "Prodigy",             songs: 8,  priority: 1 },
+  { name: "Havoc",               songs: 6,  priority: 2 },
+  { name: "Noreaga",             songs: 6,  priority: 3 },
+  { name: "Big Noyd",            songs: 6,  priority: 3 },
+  { name: "Cormega",             songs: 6,  priority: 2 },
+  { name: "Nature",              songs: 6,  priority: 3 },
 ];
 
 // ── Genius API ────────────────────────────────────────────────────────────────
