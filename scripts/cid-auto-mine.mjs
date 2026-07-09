@@ -65,9 +65,9 @@ const APPROVED_ARTISTS = [
 
   // Atlanta universe
   { name: "Andre 3000",          songs: 8,  priority: 1 },
-  { name: "Big Boi",             songs: 8,  priority: 2 },
+  { name: "Big Boi",             songs: 8,  priority: 2, artistId: 318 },
   { name: "Gucci Mane",          songs: 8,  priority: 2 },
-  { name: "Young Jeezy",         songs: 8,  priority: 2 },
+  { name: "Young Jeezy",         songs: 8,  priority: 2, artistId: 67, geniusName: "Jeezy" },
 
   // NYC / Jay-Z universe
   { name: "Jay-Z",               songs: 8,  priority: 1 },
@@ -89,7 +89,7 @@ const APPROVED_ARTISTS = [
   // Individual icons
   { name: "Big L",               songs: 8,  priority: 1 },
   { name: "Big Pun",             songs: 6,  priority: 1 },
-  { name: "MF DOOM",             songs: 8,  priority: 1 },
+  { name: "MF DOOM",             songs: 8,  priority: 1, artistId: 70 },
   { name: "Lupe Fiasco",         songs: 8,  priority: 2 },
   { name: "Vince Staples",       songs: 6,  priority: 2 },
   { name: "JID",                 songs: 6,  priority: 2 },
@@ -150,7 +150,7 @@ function fetchLyricsPage(url) {
 }
 
 // ── Run lyric-miner as subprocess for each artist ────────────────────────────
-function runMiner(artistName, songCount, outDir) {
+function runMiner(artistName, songCount, outDir, { artistId, geniusName } = {}) {
   const env = {
     ...process.env,
     GENIUS_TOKEN: process.env.GENIUS_TOKEN,
@@ -160,13 +160,23 @@ function runMiner(artistName, songCount, outDir) {
     API_BASE: process.env.API_BASE || "https://rhymemath-production.up.railway.app",
   };
 
-  const cmd = [
-    "node", "scripts/lyric-miner.mjs",
-    "--artist", `"${artistName}"`,
-    "--songs", String(songCount),
-    "--outdir", `"${outDir}"`,
-    "--analyze",  // score and write every verse to analyses table
-  ].join(" ");
+  // Build flags — use artistId to bypass Genius name search when provided
+  // geniusName overrides the search string (for name mismatches like Young Jeezy → Jeezy)
+  const parts = ["node", "scripts/lyric-miner.mjs"];
+  if (artistId) {
+    parts.push("--artist-id", String(artistId));
+    // Still need --artist for canonical name used in DB writes
+    parts.push("--artist", `"${artistName}"`);
+  } else if (geniusName) {
+    parts.push("--artist", `"${geniusName}"`);
+  } else {
+    parts.push("--artist", `"${artistName}"`);
+  }
+  parts.push("--songs", String(songCount));
+  parts.push("--outdir", `"${outDir}"`);
+  parts.push("--analyze");  // score and write every verse to analyses table
+
+  const cmd = parts.join(" ");
 
   try {
     // 10 min timeout — 12 songs × 4 sections × ~3s scoring + fetch time
@@ -267,7 +277,7 @@ async function main() {
 
     process.stdout.write(`\n[${++artistsProcessed}/${artists.length}] ${artist.name} (${songs} songs)... `);
 
-    const mineResult = runMiner(artist.name, songs, outDir);
+    const mineResult = runMiner(artist.name, songs, outDir, { artistId: artist.artistId, geniusName: artist.geniusName });
     if (!mineResult.success) {
       console.log(`FAILED — ${mineResult.output.slice(0, 80)}`);
       await logMine(pool, artist.name, "error", 0);
