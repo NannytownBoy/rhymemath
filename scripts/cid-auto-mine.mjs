@@ -46,33 +46,33 @@ const SONGS_PER = parseInt(args[args.indexOf("--songs") + 1] || "8", 10);
 // "songs" overrides SONGS_PER for that specific artist.
 const APPROVED_ARTISTS = [
   // Wu-Tang / Staten Island universe
-  { name: "Ghostface Killah",    songs: 12, priority: 1 },
-  { name: "Raekwon",             songs: 10, priority: 1 },
+  { name: "Ghostface Killah",    songs: 8,  priority: 1 },
+  { name: "Raekwon",             songs: 8,  priority: 1 },
   { name: "GZA",                 songs: 8,  priority: 1 },
   { name: "Method Man",          songs: 8,  priority: 1 },
   { name: "Inspectah Deck",      songs: 8,  priority: 1 },
 
   // Dipset / Harlem universe
-  { name: "Cam'ron",             songs: 12, priority: 1 },
+  { name: "Cam'ron",             songs: 8,  priority: 1 },
   { name: "Juelz Santana",       songs: 8,  priority: 2 },
   { name: "Jim Jones",           songs: 8,  priority: 2 },
 
   // Griselda / Buffalo universe
-  { name: "Westside Gunn",       songs: 12, priority: 1 },
-  { name: "Mach-Hommy",          songs: 10, priority: 1 },
+  { name: "Westside Gunn",       songs: 8,  priority: 1 },
+  { name: "Mach-Hommy",          songs: 8,  priority: 1 },
   { name: "Conway the Machine",  songs: 8,  priority: 1 },
   { name: "Benny the Butcher",   songs: 8,  priority: 2 },
 
   // Atlanta universe
-  { name: "Andre 3000",          songs: 10, priority: 1 },
+  { name: "Andre 3000",          songs: 8,  priority: 1 },
   { name: "Big Boi",             songs: 8,  priority: 2 },
   { name: "Gucci Mane",          songs: 8,  priority: 2 },
   { name: "Young Jeezy",         songs: 8,  priority: 2 },
 
   // NYC / Jay-Z universe
-  { name: "Jay-Z",               songs: 12, priority: 1 },
-  { name: "Kanye West",          songs: 10, priority: 1 },
-  { name: "Nas",                 songs: 10, priority: 1 },
+  { name: "Jay-Z",               songs: 8,  priority: 1 },
+  { name: "Kanye West",          songs: 8,  priority: 1 },
+  { name: "Nas",                 songs: 8,  priority: 1 },
   { name: "AZ",                  songs: 8,  priority: 2 },
   { name: "Foxy Brown",          songs: 6,  priority: 3 },
 
@@ -82,14 +82,14 @@ const APPROVED_ARTISTS = [
   { name: "Black Thought",       songs: 8,  priority: 1 },
 
   // West Coast
-  { name: "Kendrick Lamar",      songs: 10, priority: 1 },
+  { name: "Kendrick Lamar",      songs: 8,  priority: 1 },
   { name: "Nipsey Hussle",       songs: 8,  priority: 2 },
   { name: "Dom Kennedy",         songs: 6,  priority: 3 },
 
   // Individual icons
   { name: "Big L",               songs: 8,  priority: 1 },
-  { name: "Big Pun",             songs: 8,  priority: 1 },
-  { name: "MF DOOM",             songs: 10, priority: 1 },
+  { name: "Big Pun",             songs: 6,  priority: 1 },
+  { name: "MF DOOM",             songs: 8,  priority: 1 },
   { name: "Lupe Fiasco",         songs: 8,  priority: 2 },
   { name: "Vince Staples",       songs: 6,  priority: 2 },
   { name: "JID",                 songs: 6,  priority: 2 },
@@ -169,8 +169,8 @@ function runMiner(artistName, songCount, outDir) {
   ].join(" ");
 
   try {
-    // Increase timeout — scoring adds ~2s per song
-    const output = execSync(cmd, { env, encoding: "utf8", timeout: 300000 });
+    // 10 min timeout — 12 songs × 4 sections × ~3s scoring + fetch time
+    const output = execSync(cmd, { env, encoding: "utf8", timeout: 600000 });
     return { success: true, output };
   } catch (e) {
     return { success: false, output: e.message };
