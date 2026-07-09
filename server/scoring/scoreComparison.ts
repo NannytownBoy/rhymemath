@@ -498,8 +498,10 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   const pronounScore = clamp(analysis.pronounConsistency * 20);
   // Emotional arc — feeling words = emotional investment
   const emotionalScore = clamp(analysis.emotionalArc * 3);
-  // Verse length (longer verse = more room for story)
-  const lengthScore = analysis.lineCount >= 12 ? 15 : analysis.lineCount >= 8 ? 10 : 5;
+  // Verse length — only rewards extended verses, never penalizes short/dense ones.
+  // 8 lines IS a complete hip-hop verse (Biggie, Rakim, Pun all frequently go 8 bars).
+  // Scores ≤8 lines get the same credit as 8-11 — density is not a storytelling flaw.
+  const lengthScore = analysis.lineCount >= 12 ? 15 : 10; // flat 10 for anything under 12 lines
 
   // NEW: Scene detail — specific concrete nouns ground the verse in a real world
   // Nas: rikers, bus, weed, gun, beast, cycle. Each one paints a picture.
@@ -537,9 +539,11 @@ function scoreStorytelling(verse: string): { score: number; evidence: string[] }
   // Floor at 0.4 so abstract/philosophical verses (low named-ref density) aren't penalized
   const cohesionScale = Math.max(0.4, cohesion);
 
-  // Short verse adjustment: 8-16 bars IS a complete verse in hip-hop — don't penalize it.
-  // Only fragments (under 8 lines) get a raised floor to compensate for missing arc room.
-  // 8+ lines = full verse, standard floor applies.
+  // Short verse floor: prevents tiny fragments from scoring near-zero on storytelling.
+  // 8+ lines = full verse, standard 32 floor applies (Biggie 8-bar verses, Rakim quatrains).
+  // 4-7 lines = partial verse, moderate lift to 40.
+  // <4 lines = hook/fragment, generous floor at 44.
+  // NOTE: we never PENALIZE for being short — only reward extended verses via lengthScore above.
   const shortVerseFloor = analysis.lineCount < 4 ? 44  // hook/fragment — very generous floor
     : analysis.lineCount < 8 ? 40                       // partial verse — moderate lift
     : 32;                                               // 8+ lines = complete verse, standard floor

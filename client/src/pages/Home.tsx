@@ -414,12 +414,12 @@ export default function Home() {
                     </span>
                     {linesA < 4 && (
                       <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
-                        Too short — paste at least 8 bars for accurate scoring.
+                        Very short — this may not have enough content to score accurately.
                       </span>
                     )}
                     {linesA >= 4 && linesA < 8 && (
                       <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
-                        Partial verse detected. 8+ bars recommended for full scoring.
+                        Note: 8+ bars gives more data for scoring — but short dense verses score fine.
                       </span>
                     )}
                   </div>
@@ -501,12 +501,12 @@ export default function Home() {
                       </span>
                       {linesB < 4 && (
                         <span className="rm-label" style={{ display: "block", color: "#cc0000", marginTop: "2px" }}>
-                          Too short — paste at least 8 bars for accurate scoring.
+                          Very short — this may not have enough content to score accurately.
                         </span>
                       )}
                       {linesB >= 4 && linesB < 8 && (
                         <span className="rm-label" style={{ display: "block", color: "#996600", marginTop: "2px" }}>
-                          Partial verse detected. 8+ bars recommended for full scoring.
+                          Note: 8+ bars gives more data for scoring — but short dense verses score fine.
                         </span>
                       )}
                     </div>
