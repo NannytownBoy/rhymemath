@@ -17,8 +17,41 @@ function toTitleCase(s: string): string {
   // Known all-caps rapper names / acronyms that must NOT be lowercased
   const PRESERVE_CAPS = new Set(['JID','DMX','AZ','BIG','UGK','TDE','NYC','LA','DJ','MC','OG','RZA','GZA','MF','MCA','BDP','KRS','NWA','EPMD','LL','JAY','WC']);
   const PRESERVE_HYPHENATED: Record<string,string> = { 'mach-hommy': 'Mach-Hommy' };
-  // Check full string against hyphenated lookup first
+  // Canonical full-name overrides — names that must never be auto-cased
+  const CANONICAL_NAMES: Record<string,string> = {
+    'notorious b.i.g.':      'Notorious B.I.G.',
+    'notorious big':         'Notorious B.I.G.',
+    'biggie smalls':         'Notorious B.I.G.',
+    'mf doom':               'MF DOOM',
+    'jid':                   'JID',
+    'ab-soul':               'Ab-Soul',
+    'el-p':                  'El-P',
+    'jay electronica':       'Jay Electronica',
+    'ghostface killah':      'Ghostface Killah',
+    'ghostface':             'Ghostface Killah',
+    'big pun':               'Big Pun',
+    'yasiin bey':            'Yasiin Bey',
+    'mos def':               'Yasiin Bey',
+    'your old droog':        'Your Old Droog',
+    'joell ortiz':           'Joell Ortiz',
+    'kool g rap':            'Kool G Rap',
+    'canibus':               'Canibus',
+    'posdnuos':              'Posdnuos',
+    'posdnous':              'Posdnuos',
+    'pharoahe monch':        'Pharoahe Monch',
+    'homeboy sandman':       'Homeboy Sandman',
+    'mach-hommy':            'Mach-Hommy',
+    'j. cole':               'J. Cole',
+    'kendrick lamar':        'Kendrick Lamar',
+    'black thought':         'Black Thought',
+    'jay-z':                 'JAY-Z',
+    'kanye west':            'Kanye West',
+    'freddie gibbs':         'Freddie Gibbs',
+    'andre 3000':            'Andre 3000',
+  };
+  // Check full string against canonical names first
   const fullLower = s.trim().toLowerCase();
+  if (CANONICAL_NAMES[fullLower]) return CANONICAL_NAMES[fullLower];
   if (PRESERVE_HYPHENATED[fullLower]) return PRESERVE_HYPHENATED[fullLower];
   return s.trim().replace(/\w\S*/g, (word, offset) => {
     // Preserve known all-caps names and acronyms (2-5 all-uppercase letters)
@@ -564,7 +597,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const query = ((req.query.q as string) ?? "").toLowerCase();
       const trending = req.query.trending === "1"; // if true, return top 10 by 24h activity
       const toSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      const toTitleCase = (s: string) => s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      const toTitleCase = (s: string) => {
+        if (!s) return s;
+        const CANONICAL: Record<string,string> = {
+          'notorious b.i.g.': 'Notorious B.I.G.', 'notorious big': 'Notorious B.I.G.',
+          'biggie smalls': 'Notorious B.I.G.', 'mf doom': 'MF DOOM', 'jid': 'JID',
+          'ab-soul': 'Ab-Soul', 'el-p': 'El-P', 'ghostface': 'Ghostface Killah',
+          'ghostface killah': 'Ghostface Killah', 'big pun': 'Big Pun',
+          'yasiin bey': 'Yasiin Bey', 'mos def': 'Yasiin Bey',
+          'your old droog': 'Your Old Droog', 'joell ortiz': 'Joell Ortiz',
+          'kool g rap': 'Kool G Rap', 'pharoahe monch': 'Pharoahe Monch',
+          'mach-hommy': 'Mach-Hommy', 'j. cole': 'J. Cole', 'jay-z': 'JAY-Z',
+          'posdnuos': 'Posdnuos', 'posdnous': 'Posdnuos',
+        };
+        const key = s.trim().toLowerCase();
+        if (CANONICAL[key]) return CANONICAL[key];
+        return s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      };
       const now = Date.now();
       const oneDayAgo = now - 24 * 60 * 60 * 1000;
 

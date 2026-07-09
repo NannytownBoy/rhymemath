@@ -132,8 +132,23 @@ export class DatabaseStorage implements IStorage {
     const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-"));
 
     // Title-case helper for display names
-    const toTitleCase = (s: string) =>
-      s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    const CANONICAL_NAMES: Record<string,string> = {
+      'notorious b.i.g.': 'Notorious B.I.G.', 'notorious big': 'Notorious B.I.G.',
+      'biggie smalls': 'Notorious B.I.G.', 'mf doom': 'MF DOOM', 'jid': 'JID',
+      'ab-soul': 'Ab-Soul', 'el-p': 'El-P', 'ghostface': 'Ghostface Killah',
+      'ghostface killah': 'Ghostface Killah', 'big pun': 'Big Pun',
+      'yasiin bey': 'Yasiin Bey', 'mos def': 'Yasiin Bey',
+      'your old droog': 'Your Old Droog', 'joell ortiz': 'Joell Ortiz',
+      'kool g rap': 'Kool G Rap', 'pharoahe monch': 'Pharoahe Monch',
+      'mach-hommy': 'Mach-Hommy', 'j. cole': 'J. Cole', 'jay-z': 'JAY-Z',
+      'posdnuos': 'Posdnuos', 'posdnous': 'Posdnuos',
+    };
+    const toTitleCase = (s: string) => {
+      if (!s) return s;
+      const key = s.trim().toLowerCase();
+      if (CANONICAL_NAMES[key]) return CANONICAL_NAMES[key];
+      return s.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    };
 
     const artistMap: Record<string, {
       artistName: string;

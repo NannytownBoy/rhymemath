@@ -146,6 +146,55 @@ if (!ARTIST_NAME) {
   process.exit(1);
 }
 
+// ── Canonical artist name map — ensures DB always gets the correct spelling ──
+const CANONICAL_ARTIST_NAMES = {
+  'notorious b.i.g.':      'Notorious B.I.G.',
+  'notorious big':         'Notorious B.I.G.',
+  'biggie':                'Notorious B.I.G.',
+  'biggie smalls':         'Notorious B.I.G.',
+  'mf doom':               'MF DOOM',
+  'jid':                   'JID',
+  'ab-soul':               'Ab-Soul',
+  'ab soul':               'Ab-Soul',
+  'el-p':                  'El-P',
+  'el p':                  'El-P',
+  'ghostface':             'Ghostface Killah',
+  'ghostface killah':      'Ghostface Killah',
+  'big pun':               'Big Pun',
+  'yasiin bey':            'Yasiin Bey',
+  'mos def':               'Yasiin Bey',
+  'your old droog':        'Your Old Droog',
+  'joell ortiz':           'Joell Ortiz',
+  'joel ortiz':            'Joell Ortiz',
+  'kool g rap':            'Kool G Rap',
+  'canibus':               'Canibus',
+  'pharoahe monch':        'Pharoahe Monch',
+  'homeboy sandman':       'Homeboy Sandman',
+  'mach-hommy':            'Mach-Hommy',
+  'j. cole':               'J. Cole',
+  'j cole':                'J. Cole',
+  'kendrick lamar':        'Kendrick Lamar',
+  'black thought':         'Black Thought',
+  'jay-z':                 'JAY-Z',
+  'jay z':                 'JAY-Z',
+  'posdnuos':              'Posdnuos',
+  'posdnous':              'Posdnuos',
+  'dead prez':             'Dead Prez',
+  'danny brown':           'Danny Brown',
+  'styles p':              'Styles P',
+  'mozzy':                 'Mozzy',
+  'cam\'ron':              "Cam'ron",
+  'camron':                "Cam'ron",
+  'beanie sigel':          'Beanie Sigel',
+  'talib kweli':           'Talib Kweli',
+  'nas':                   'Nas',
+  'andre 3000':            'Andre 3000',
+  'kanye west':            'Kanye West',
+};
+
+// Normalize the incoming artist name before anything touches the DB
+const artist = CANONICAL_ARTIST_NAMES[ARTIST_NAME.trim().toLowerCase()] || ARTIST_NAME.trim();
+
 if (!GENIUS_TOKEN && !LOCAL_FILE) {
   console.error("Error: GENIUS_TOKEN env var required unless using --file mode.");
   process.exit(1);
@@ -742,7 +791,7 @@ async function mineText(text, songTitle, artistName) {
 async function main() {
   console.log(`\n╔═══════════════════════════════════════════════════╗`);
   console.log(`║  PH Labs CID Lyric Miner                          ║`);
-  console.log(`║  Artist: ${ARTIST_NAME.padEnd(40)}║`);
+  console.log(`║  Artist: ${artist.padEnd(40)}║`);
   console.log(`╚═══════════════════════════════════════════════════╝\n`);
 
   const allRecords = [];
@@ -754,7 +803,7 @@ async function main() {
     console.log(`Reading local file: ${LOCAL_FILE}`);
     const text = fs.readFileSync(LOCAL_FILE, "utf8");
     allTexts.push(text);
-    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE), ARTIST_NAME);
+    const { records, aliases } = await mineText(text, path.basename(LOCAL_FILE), artist);
     allRecords.push(...records);
     allAliases.push(...aliases);
     console.log(`  Found ${records.length} candidate records\n`);
@@ -774,7 +823,7 @@ async function main() {
         artistId = parseInt(ARTIST_ID_ARG, 10);
         console.log(`Using provided artist ID: ${artistId}`);
       } else {
-        console.log(`Searching Genius for artist: ${ARTIST_NAME}...`);
+        console.log(`Searching Genius for artist: ${artist}...`);
         artistId = await searchArtist(ARTIST_NAME);
         if (!artistId) { console.error("Artist not found on Genius."); process.exit(1); }
         console.log(`Found artist ID: ${artistId}`);
@@ -794,7 +843,7 @@ async function main() {
           continue;
         }
         allTexts.push(text);
-        const { records, aliases } = await mineText(text, title, ARTIST_NAME);
+        const { records, aliases } = await mineText(text, title, artist);
         allRecords.push(...records);
         allAliases.push(...aliases);
         process.stdout.write(`+${records.length} records`);
@@ -802,7 +851,7 @@ async function main() {
         // ── Analyze-and-store (opt-in via --analyze flag) ──────────────────
         if (ANALYZE && DATABASE_URL) {
           const stored = await analyzeAndStoreInline({
-            artist: ARTIST_NAME,
+            artist: artist,
             title: song.title || title,
             lyrics: text,
             source: "genius",
@@ -832,7 +881,7 @@ async function main() {
         if (!EXISTING_CID.has(key) && !COMMON_WORDS.has(key)) {
           const rec = buildRecord({
             term: phrase,
-            definition: `Repeated phrase across ${ARTIST_NAME} corpus`,
+            definition: `Repeated phrase across ${artist} corpus`,
             category: "slang",
             confidence: 4,
             reviewStatus: "needs_review",
