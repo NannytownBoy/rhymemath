@@ -347,54 +347,41 @@ async function analyzeAndStoreInline({ artist, title, lyrics, source, sourceId, 
   const sections = splitLyricsIntoSections(lyrics);
   const results = [];
 
-  for (const { label, index, text } of sections) {
+  for (const { label, text } of sections) {
     const hash = hashVerse(text);
 
-    // Duplicate check
+    // Duplicate check — skip if this exact verse text was already scored
     const dup = await pool.query("SELECT id FROM analyses WHERE text_hash = $1 LIMIT 1", [hash]);
     if (dup.rows.length > 0) { results.push({ status: "skip", label }); continue; }
 
-    // Score via local API
+    if (dryRun) { results.push({ status: "dry-run", label }); continue; }
+
+    // POST to /api/analyze — the server handles scoring + DB persistence
+    // Response shape: { scores: { overall, flow, wordplay, storytelling, rhyming, punchlines }, ... }
     let scored = null;
     try {
-      const res = await fetch(`${API_BASE}/api/solo`, {
+      const res = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artistName: artist, songTitle: title, verse: text, verseLabel: label, save: false }),
+        body: JSON.stringify({ artistName: artist, songName: title, verse: text, verseLabel: label }),
       });
-      if (res.ok) scored = await res.json();
+      if (res.ok) {
+        const json = await res.json();
+        // Server returns { scores: { overall, flow, ... }, resultId, ... }
+        // Confirm it's a valid scoring response (not an HTML error page)
+        if (json && json.scores && typeof json.scores.overall === "number") {
+          scored = json;
+        }
+      }
     } catch (_) {}
 
-    if (!scored) { results.push({ status: "flag", label }); continue; }
-    if (dryRun) { results.push({ status: "dry-run", label, score: scored.scoreOverall }); continue; }
-
-    const resultId = `genius-${sourceId || "manual"}-${label}-${hash.slice(0, 8)}`;
-    const now = Math.floor(Date.now() / 1000);
-    try {
-      await pool.query(`
-        INSERT INTO analyses (
-          result_id, artist_name, song_name, verse_label,
-          section_label, section_index, text_hash, source, source_id, verse,
-          scoring_mode, result_json,
-          score_overall, score_flow, score_wordplay, score_storytelling, score_rhyming, score_punchlines,
-          created_at, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19)
-        ON CONFLICT (result_id) DO UPDATE SET
-          score_overall=EXCLUDED.score_overall, score_flow=EXCLUDED.score_flow,
-          score_wordplay=EXCLUDED.score_wordplay, score_storytelling=EXCLUDED.score_storytelling,
-          score_rhyming=EXCLUDED.score_rhyming, score_punchlines=EXCLUDED.score_punchlines,
-          result_json=EXCLUDED.result_json, updated_at=EXCLUDED.updated_at
-      `, [
-        resultId, artist, title, label, label, index, hash,
-        source, sourceId ? String(sourceId) : null, text,
-        "standard-v5.0", JSON.stringify(scored),
-        scored.scoreOverall||0, scored.scoreFlow||0, scored.scoreWordplay||0,
-        scored.scoreStorytelling||0, scored.scoreRhyming||0, scored.scorePunchlines||0, now
-      ]);
-      results.push({ status: "insert", label, score: scored.scoreOverall });
-    } catch (err) {
-      results.push({ status: "error", label, reason: err.message });
+    if (!scored) {
+      results.push({ status: "flag", label });
+      continue;
     }
+
+    // Server already persisted to DB via saveAnalysis() — just report the score
+    results.push({ status: "insert", label, score: scored.scores.overall });
   }
 
   await pool.end();
