@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient.js";
 import { Toaster } from "./components/ui/toaster.js";
 import { NavBar } from "./components/NavBar.js";
+import { AuthProvider } from "./context/AuthContext.js";
 import Home from "./pages/Home.js";
 import Results from "./pages/Results.js";
 import Rappers from "./pages/Rappers.js";
@@ -14,6 +15,8 @@ import Community from "./pages/Community.js";
 import Terms from "./pages/Terms.js";
 import Privacy from "./pages/Privacy.js";
 import SoloResults from "./pages/SoloResults.js";
+import Login from "./pages/Login.js";
+import Admin from "./pages/Admin.js";
 import NotFound from "./pages/not-found.js";
 
 // Inline SVG icons for social links
@@ -110,6 +113,8 @@ function AppRoutes() {
           <Route path="/terms" component={Terms} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/analysis/:id" component={SoloResults} />
+          <Route path="/login" component={Login} />
+          <Route path="/admin" component={Admin} />
           <Route component={NotFound} />
         </Switch>
       </div>
@@ -121,10 +126,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router hook={useHashLocation}>
-        <AppRoutes />
-      </Router>
-      <Toaster />
+      <AuthProvider>
+        <Router hook={useHashLocation}>
+          <AppRoutes />
+        </Router>
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

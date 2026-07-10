@@ -323,13 +323,22 @@ async function main() {
     ssl: { rejectUnauthorized: false },
   });
 
-  // Skip artists mined in the last 3 days
-  const recentlyMined = await getLastMinedArtists(pool);
-  const artists = APPROVED_ARTISTS
-    .sort((a, b) => a.priority - b.priority)
-    .filter(a => !recentlyMined.has(a.name.toLowerCase()));
+  // Cooldown: skip artists mined recently
+  // COOLDOWN_DAYS env var overrides default (set to 0 for round-the-clock mining)
+  const COOLDOWN_DAYS = parseFloat(process.env.COOLDOWN_DAYS ?? '3');
+  const FORCE_ALL = process.env.FORCE_ALL === '1' || COOLDOWN_DAYS === 0;
 
-  console.log(`Artists to mine this run: ${artists.length} (${APPROVED_ARTISTS.length - artists.length} skipped, mined recently)\n`);
+  let artists;
+  if (FORCE_ALL) {
+    artists = APPROVED_ARTISTS.sort((a, b) => a.priority - b.priority);
+    console.log(`Artists to mine this run: ${artists.length} (FORCE_ALL — cooldown bypassed)\n`);
+  } else {
+    const recentlyMined = await getLastMinedArtists(pool, COOLDOWN_DAYS);
+    artists = APPROVED_ARTISTS
+      .sort((a, b) => a.priority - b.priority)
+      .filter(a => !recentlyMined.has(a.name.toLowerCase()));
+    console.log(`Artists to mine this run: ${artists.length} (${APPROVED_ARTISTS.length - artists.length} skipped, cooldown ${COOLDOWN_DAYS}d)\n`);
+  }
 
   const tmpBase = `/tmp/cid_automine_${Date.now()}`;
   fs.mkdirSync(tmpBase, { recursive: true });

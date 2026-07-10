@@ -9,8 +9,18 @@ export GENIUS_TOKEN="${GENIUS_TOKEN:-2eKGsXG31hJYunM85zb-3IyIZsNhZ1uPBAyoV1qfWz4
 export DATABASE_URL="${DATABASE_URL:-postgresql://postgres:TsKMoFmORcQVhbhlDMJVlsbTrKGmRELC@reseau.proxy.rlwy.net:12215/railway}"
 export API_BASE="${API_BASE:-https://rhymemath-production.up.railway.app}"
 
+# CONTINUOUS=1 — bypass cooldowns entirely, mine round-the-clock
+# COOLDOWN_DAYS=1 — shorter 1-day cooldown instead of 3
+if [ "${CONTINUOUS:-0}" = "1" ]; then
+  export COOLDOWN_DAYS=0
+  WAIT_HOURS=1  # between rounds
+  echo "  MODE: CONTINUOUS (no cooldowns, 1h between rounds)"
+else
+  export COOLDOWN_DAYS="${COOLDOWN_DAYS:-3}"
+  WAIT_HOURS=6
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WAIT_HOURS=6
 RUN=0
 
 echo "╔══════════════════════════════════════════════╗"

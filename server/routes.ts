@@ -6,6 +6,7 @@ import { scoreCIDSignals, clearCIDCache } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
+import { registerCommunityRoutes } from "./communityRoutes";
 
 // ── Scoring version — bump when formula changes significantly ─────────────────
 const SCORING_VERSION = "v5.0";
@@ -985,6 +986,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(500).json({ error: "DB health check failed." });
     }
   });
+
+  // ── Community (auth, annotations, admin) ──────────────────────────────────
+  registerCommunityRoutes(app);
 
   // ── POST /api/cid/cache-clear ────────────────────────────────────────────
   // Called by cid-auto-mine after each successful import so new entendres/punchlines

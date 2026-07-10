@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, serial, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -197,7 +197,85 @@ export const insertAnalysisSchema = createInsertSchema(analyses).omit({ id: true
 export type InsertAnalysis = z.infer<typeof insertAnalysisSchema>;
 export type Analysis = typeof analyses.$inferSelect;
 
-// ─── Community Users ──────────────────────────────────────────────────────────
+// ─── Users ───────────────────────────────────────────────────────────────────
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("member"), // "member" | "moderator" | "admin"
+  points: integer("points").notNull().default(0),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: integer("reset_token_expiry"),
+  createdAt: integer("created_at").notNull(),
+  lastLoginAt: integer("last_login_at"),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, points: true, role: true, resetToken: true, resetTokenExpiry: true, lastLoginAt: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+// ─── Annotations ─────────────────────────────────────────────────────────────
+// Users flag a specific line/phrase in a scored verse and explain its meaning
+export const annotations = pgTable("annotations", {
+  id: serial("id").primaryKey(),
+  // What verse this annotation belongs to
+  analysisId: text("analysis_id"),     // resultId from analyses table (solo)
+  comparisonId: text("comparison_id"), // resultId from comparisons table (battle)
+  side: text("side"),                  // "A" | "B" | null (battle only)
+  // The annotated content
+  anchorText: text("anchor_text").notNull(),       // exact phrase highlighted
+  startIndex: integer("start_index"),              // char offset in verse
+  endIndex: integer("end_index"),                  // char offset in verse
+  meaning: text("meaning").notNull(),              // what does it mean
+  meaningType: text("meaning_type").notNull(),     // "double_entendre"|"punchline"|"cultural_ref"|"wordplay"|"metaphor"|"historical_ref"
+  interpretation1: text("interpretation_1"),       // surface reading
+  interpretation2: text("interpretation_2"),       // deeper/hidden reading
+  interpretation3: text("interpretation_3"),       // third layer if any
+  domainTags: text("domain_tags"),                 // comma-separated: street,luxury,religion,etc.
+  // Curation
+  status: text("status").notNull().default("pending"), // "pending"|"approved"|"rejected"
+  reviewedBy: text("reviewed_by"),                 // username of moderator/admin
+  reviewNote: text("review_note"),                 // optional note from reviewer
+  promoteToCID: boolean("promote_to_cid").default(false), // if approved, push to CID?
+  // Authorship
+  submittedBy: integer("submitted_by").notNull(),  // users.id
+  submittedByUsername: text("submitted_by_username").notNull(),
+  pointsAwarded: integer("points_awarded").default(0),
+  createdAt: integer("created_at").notNull(),
+  reviewedAt: integer("reviewed_at"),
+});
+
+export const insertAnnotationSchema = createInsertSchema(annotations).omit({ id: true, status: true, reviewedBy: true, reviewNote: true, reviewedAt: true, pointsAwarded: true });
+export type InsertAnnotation = z.infer<typeof insertAnnotationSchema>;
+export type Annotation = typeof annotations.$inferSelect;
+
+// ─── Points ledger ────────────────────────────────────────────────────────────
+export const pointsLedger = pgTable("points_ledger", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  delta: integer("delta").notNull(),           // positive = earned, negative = spent
+  reason: text("reason").notNull(),            // "profile_created"|"annotation_submitted"|"annotation_approved"|"annotation_rejected"
+  referenceId: integer("reference_id"),        // annotations.id if relevant
+  createdAt: integer("created_at").notNull(),
+});
+
+export const insertPointsLedgerSchema = createInsertSchema(pointsLedger).omit({ id: true });
+export type InsertPointsLedger = z.infer<typeof insertPointsLedgerSchema>;
+export type PointsLedger = typeof pointsLedger.$inferSelect;
+
+// Points config
+export const POINTS = {
+  PROFILE_CREATED:        50,
+  ANNOTATION_SUBMITTED:   10,
+  ANNOTATION_APPROVED:    25,
+  ANNOTATION_REJECTED:    -5,
+  ANNOTATION_CID_PROMOTED: 50,
+} as const;
+
+// ─── Community Users (legacy alias) ──────────────────────────────────────────
 export const communityUsers = pgTable("community_users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
