@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
-import { scoreCIDSignals } from "./scoring/cidLookup";
+import { scoreCIDSignals, clearCIDCache } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
