@@ -94,13 +94,15 @@ function AnnotationQueue({ statusFilter, setStatusFilter }: { statusFilter: stri
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {["pending", "approved", "rejected"].map(s => (
+        {["pending", "challenged", "approved", "rejected"].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)} style={{
             fontFamily: MONO, fontSize: 11, padding: "4px 12px",
-            background: statusFilter === s ? BLUE : "#eee",
-            color: statusFilter === s ? "#fff" : "#333",
-            border: "1px solid #ccc", cursor: "pointer",
-          }}>{s.toUpperCase()}</button>
+            background: statusFilter === s ? (s === "challenged" ? "#8b4400" : BLUE) : "#eee",
+            color: statusFilter === s ? "#fff" : s === "challenged" ? "#8b4400" : "#333",
+            border: s === "challenged" ? "1px solid #8b4400" : "1px solid #ccc", cursor: "pointer",
+          }}>
+            {s === "challenged" ? "⚠ FLAGGED" : s.toUpperCase()}
+          </button>
         ))}
       </div>
 
@@ -131,30 +133,45 @@ function AnnotationQueue({ statusFilter, setStatusFilter }: { statusFilter: stri
           {ann.interpretation_2 && <div><strong>Hidden:</strong> {ann.interpretation_2}</div>}
           {ann.interpretation_3 && <div><strong>3rd layer:</strong> {ann.interpretation_3}</div>}
 
-          {ann.status === "pending" && (
-            <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <input
-                placeholder="Optional note to submitter..."
-                value={notes[ann.id] || ""}
-                onChange={e => setNotes(n => ({ ...n, [ann.id]: e.target.value }))}
-                style={{ flex: 1, minWidth: 200, padding: "5px 8px", fontFamily: MONO, fontSize: 11, border: "1px solid #ccc" }}
-              />
-              <label style={{ fontFamily: MONO, fontSize: 11, cursor: "pointer" }}>
-                <input type="checkbox" checked={promoting[ann.id] || false}
-                  onChange={e => setPromoting(p => ({ ...p, [ann.id]: e.target.checked }))} />
-                {" "}Push to CID +{50}pts
-              </label>
-              <button onClick={() => reviewMutation.mutate({ id: ann.id, status: "approved", reviewNote: notes[ann.id], promoteToCID: promoting[ann.id] || false })}
-                style={{ fontFamily: MONO, fontSize: 11, padding: "5px 14px", background: "#1a7a1a", color: "#fff", border: "none", cursor: "pointer" }}>
-                ✓ APPROVE
-              </button>
-              <button onClick={() => reviewMutation.mutate({ id: ann.id, status: "rejected", reviewNote: notes[ann.id] })}
-                style={{ fontFamily: MONO, fontSize: 11, padding: "5px 14px", background: "#7a1a1a", color: "#fff", border: "none", cursor: "pointer" }}>
-                ✗ REJECT
-              </button>
+          {(ann.status === "pending" || ann.status === "challenged") && (
+            <div style={{ marginTop: 12 }}>
+              {ann.status === "challenged" && (
+                <ChallengeReasons annotationId={ann.id} />
+              )}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: ann.status === "challenged" ? 10 : 0 }}>
+                <input
+                  placeholder="Optional note to submitter..."
+                  value={notes[ann.id] || ""}
+                  onChange={e => setNotes(n => ({ ...n, [ann.id]: e.target.value }))}
+                  style={{ flex: 1, minWidth: 200, padding: "5px 8px", fontFamily: MONO, fontSize: 11, border: "1px solid #ccc" }}
+                />
+                {ann.status === "pending" && (
+                  <label style={{ fontFamily: MONO, fontSize: 11, cursor: "pointer" }}>
+                    <input type="checkbox" checked={promoting[ann.id] || false}
+                      onChange={e => setPromoting(p => ({ ...p, [ann.id]: e.target.checked }))} />
+                    {" "}Push to CID +50pts
+                  </label>
+                )}
+                {ann.status === "pending" && (
+                  <button onClick={() => reviewMutation.mutate({ id: ann.id, status: "approved", reviewNote: notes[ann.id], promoteToCID: promoting[ann.id] || false })}
+                    style={{ fontFamily: MONO, fontSize: 11, padding: "5px 14px", background: "#1a7a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                    ✓ APPROVE
+                  </button>
+                )}
+                {ann.status === "challenged" && (
+                  <button onClick={() => reviewMutation.mutate({ id: ann.id, status: "upheld", reviewNote: notes[ann.id] })}
+                    style={{ fontFamily: MONO, fontSize: 11, padding: "5px 14px", background: "#1a3a7a", color: "#fff", border: "none", cursor: "pointer" }}>
+                    ✓ UPHOLD
+                  </button>
+                )}
+                <button onClick={() => reviewMutation.mutate({ id: ann.id, status: "rejected", reviewNote: notes[ann.id] })}
+                  style={{ fontFamily: MONO, fontSize: 11, padding: "5px 14px", background: "#7a1a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                  ✗ REJECT{ann.status === "challenged" ? " (+15pts challengers)" : ""}
+                </button>
+              </div>
             </div>
           )}
-          {ann.status !== "pending" && (
+          {ann.status !== "pending" && ann.status !== "challenged" && (
             <div style={{ marginTop: 8, color: ann.status === "approved" ? "#007700" : "#cc0000", fontSize: 11 }}>
               {ann.status.toUpperCase()} by {ann.reviewed_by}
               {ann.review_note && ` — "${ann.review_note}"`}
@@ -245,6 +262,27 @@ function StatsPanel() {
         <div key={s.label} style={statStyle}>
           <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: "bold", color: s.color || BLUE }}>{s.value}</div>
           <div style={{ fontFamily: MONO, fontSize: 11, color: "#666", marginTop: 4 }}>{s.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Inline challenge reasons panel — only visible in admin FLAGGED tab
+function ChallengeReasons({ annotationId }: { annotationId: number }) {
+  const { data } = useQuery<any[]>({
+    queryKey: ["/api/admin/challenges", annotationId],
+    queryFn: () => authFetch(`/api/admin/annotations/${annotationId}/challenges`),
+  });
+  if (!data?.length) return null;
+  return (
+    <div style={{ background: "#fff8f0", border: "1px solid #8b4400", padding: "8px 12px", marginBottom: 8 }}>
+      <div style={{ fontFamily: MONO, fontSize: 10, color: "#8b4400", fontWeight: "bold", marginBottom: 6 }}>
+        CHALLENGE REASONS ({data.length})
+      </div>
+      {data.map((c: any) => (
+        <div key={c.id} style={{ fontFamily: MONO, fontSize: 11, color: "#555", marginBottom: 6, paddingLeft: 8, borderLeft: "2px solid #cc8844" }}>
+          <span style={{ color: "#888", fontSize: 10 }}>{c.username}: </span>{c.reason}
         </div>
       ))}
     </div>

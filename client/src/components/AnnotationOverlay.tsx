@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getToken } from "../lib/auth";
 import { useLocation } from "wouter";
+import { ChallengeForm } from "./ChallengeForm";
 
 const MONO = "Courier New, monospace";
 const BLUE = "#1a3a7a";
@@ -286,17 +287,7 @@ export function AnnotationOverlay({ verse, analysisId, comparisonId, side, cidTo
             COMMUNITY ANNOTATIONS ({approved.length})
           </div>
           {approved.map((ann: any) => (
-            <div key={ann.id} style={{ borderLeft: `3px solid ${TEAL}`, paddingLeft: 12, marginBottom: 12, fontFamily: MONO, fontSize: 12 }}>
-              <div style={{ fontWeight: "bold", marginBottom: 4 }}>"{ann.anchor_text}"</div>
-              <div style={{ color: "#333", marginBottom: 4 }}>{ann.meaning}</div>
-              {ann.interpretation_1 && <div style={{ color: "#666", fontSize: 11 }}>Surface: {ann.interpretation_1}</div>}
-              {ann.interpretation_2 && <div style={{ color: "#007788", fontSize: 11 }}>Hidden: {ann.interpretation_2}</div>}
-              {ann.interpretation_3 && <div style={{ color: "#884400", fontSize: 11 }}>3rd layer: {ann.interpretation_3}</div>}
-              <div style={{ color: "#aaa", fontSize: 10, marginTop: 4 }}>
-                — {ann.submitted_by_username} · {ann.meaning_type}
-                {ann.domain_tags && ` · ${ann.domain_tags}`}
-              </div>
-            </div>
+            <ApprovedAnnotation key={ann.id} ann={ann} currentUser={user} />
           ))}
         </div>
       )}

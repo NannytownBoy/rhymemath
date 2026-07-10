@@ -250,6 +250,53 @@ export function registerCommunityRoutes(app: Express) {
     } finally { await p.end(); }
   });
 
+  // POST /api/annotations/:id/challenge
+  // Silent — no public count exposed. 5 unique challenges → flag for mod review.
+  app.post("/api/annotations/:id/challenge", requireAuth, async (req, res) => {
+    const annotationId = parseInt(req.params.id);
+    const { reason } = req.body || {};
+    if (!reason?.trim()) return res.status(400).json({ error: "Reason required" });
+    const p = pool();
+    try {
+      // Verify annotation exists and is approved
+      const ann = await p.query(`SELECT * FROM annotations WHERE id=$1`, [annotationId]);
+      if (!ann.rows[0]) return res.status(404).json({ error: "Not found" });
+      if (ann.rows[0].status !== "approved") return res.status(400).json({ error: "Can only challenge approved annotations" });
+      if (ann.rows[0].submitted_by === (req as any).user.userId) {
+        return res.status(400).json({ error: "Cannot challenge your own annotation" });
+      }
+
+      // Insert challenge (unique per user+annotation)
+      try {
+        await p.query(
+          `INSERT INTO annotation_challenges (annotation_id, user_id, reason) VALUES ($1,$2,$3)`,
+          [annotationId, (req as any).user.userId, reason.trim()]
+        );
+      } catch (e: any) {
+        if (e.code === "23505") return res.status(409).json({ error: "Already challenged" });
+        throw e;
+      }
+
+      // Count total challenges — if threshold hit, silently flag for mod review
+      const THRESHOLD = 5;
+      const count = await p.query(
+        `SELECT COUNT(*) FROM annotation_challenges WHERE annotation_id=$1`,
+        [annotationId]
+      );
+      const total = parseInt(count.rows[0].count);
+      if (total >= THRESHOLD && ann.rows[0].status === "approved") {
+        await p.query(
+          `UPDATE annotations SET status='challenged' WHERE id=$1`,
+          [annotationId]
+        );
+        // Award challenger +5 pts for triggering the review
+        await awardPoints(p, (req as any).user.userId, 5, "challenge_triggered_review", annotationId);
+      }
+
+      res.json({ success: true });
+    } finally { await p.end(); }
+  });
+
   // ══════════════════════════════════════════════════════════════════════════
   // ADMIN / MODERATOR — annotation queue
   // ══════════════════════════════════════════════════════════════════════════
@@ -267,40 +314,70 @@ export function registerCommunityRoutes(app: Express) {
     } finally { await p.end(); }
   });
 
+  // GET /api/admin/annotations/:id/challenges — challenge reasons for a flagged annotation
+  app.get("/api/admin/annotations/:id/challenges", requireMod, async (req, res) => {
+    const p = pool();
+    try {
+      const result = await p.query(
+        `SELECT ac.id, ac.reason, ac.created_at, u.username
+         FROM annotation_challenges ac
+         JOIN users u ON u.id = ac.user_id
+         WHERE ac.annotation_id = $1
+         ORDER BY ac.created_at ASC`,
+        [req.params.id]
+      );
+      res.json(result.rows);
+    } finally { await p.end(); }
+  });
+
   // PATCH /api/admin/annotations/:id — approve or reject
   app.patch("/api/admin/annotations/:id", requireMod, async (req, res) => {
     const reviewer = (req as any).user as JWTPayload;
     const { id } = req.params;
     const { status, reviewNote, promoteToCID } = req.body || {};
 
-    if (!["approved", "rejected"].includes(status))
-      return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+    if (!["approved", "rejected", "upheld"].includes(status))
+      return res.status(400).json({ error: "status must be 'approved', 'rejected', or 'upheld'" });
 
     const p = pool();
     try {
       const existing = await p.query(`SELECT * FROM annotations WHERE id=$1`, [id]);
       if (existing.rows.length === 0) return res.status(404).json({ error: "Annotation not found" });
       const ann = existing.rows[0];
-      if (ann.status !== "pending") return res.status(409).json({ error: "Annotation already reviewed" });
+      if (!(["pending", "challenged"].includes(ann.status)))
+        return res.status(409).json({ error: "Annotation already reviewed" });
 
-      const pointsDelta = status === "approved" ? POINTS.ANNOTATION_APPROVED : POINTS.ANNOTATION_REJECTED;
-      const cidPromo = status === "approved" && promoteToCID === true;
+      const isChallengeReview = ann.status === "challenged";
+      // For challenged annotations: 'upheld' = mod agrees annotation is correct, 'rejected' = mod sides with challengers
+      const finalStatus = status === "upheld" ? "approved" : status;
+      const pointsDelta = finalStatus === "approved" ? POINTS.ANNOTATION_APPROVED : POINTS.ANNOTATION_REJECTED;
+      const cidPromo = finalStatus === "approved" && promoteToCID === true;
 
       await p.query(`
         UPDATE annotations SET
           status=$1, reviewed_by=$2, review_note=$3,
           promote_to_cid=$4, reviewed_at=$5, points_awarded=$6
         WHERE id=$7
-      `, [status, reviewer.username, reviewNote ?? null, cidPromo, now(), pointsDelta, id]);
+      `, [finalStatus, reviewer.username, reviewNote ?? null, cidPromo, now(), pointsDelta, id]);
 
       // Award / deduct points to submitter
       await awardPoints(p, ann.submitted_by, pointsDelta,
-        status === "approved" ? "annotation_approved" : "annotation_rejected", ann.id);
+        finalStatus === "approved" ? "annotation_approved" : "annotation_rejected", ann.id);
 
       // Extra CID promotion bonus
       if (cidPromo) {
         await awardPoints(p, ann.submitted_by, POINTS.ANNOTATION_CID_PROMOTED, "annotation_cid_promoted", ann.id);
-        // TODO: write to cid_entendre_candidates here in future sprint
+      }
+
+      // Challenge review: reward challengers if annotation was rejected
+      if (isChallengeReview && finalStatus === "rejected") {
+        const challengers = await p.query(
+          `SELECT user_id FROM annotation_challenges WHERE annotation_id=$1`,
+          [ann.id]
+        );
+        for (const row of challengers.rows) {
+          await awardPoints(p, row.user_id, 15, "challenge_upheld", ann.id);
+        }
       }
 
       res.json({ success: true, pointsAwarded: pointsDelta + (cidPromo ? POINTS.ANNOTATION_CID_PROMOTED : 0) });
