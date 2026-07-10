@@ -4,6 +4,7 @@ import { apiRequest } from "../lib/queryClient.js";
 import { SingleScoreBar } from "../components/ScoreBar.js";
 import VerseAnnotation from "../components/VerseAnnotation.js";
 import { getCachedResult } from "../lib/resultCache.js";
+import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
 
 export default function SoloResults() {
   const { id } = useParams<{ id: string }>();
@@ -200,6 +201,20 @@ export default function SoloResults() {
             <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ VERSE ANNOTATION</div>
             <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
               <VerseAnnotation lines={result.annotation ?? []} side="A" artistName={result.artistName ?? ""} />
+            </div>
+          </>
+        )}
+
+        {/* Community Annotations */}
+        {result.verse && !result.verse.startsWith("[No verse") && id && (
+          <>
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ ANNOTATIONS</div>
+            <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
+              <AnnotationOverlay
+                verse={result.verse}
+                analysisId={id}
+                artistName={result.artistName}
+              />
             </div>
           </>
         )}

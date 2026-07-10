@@ -6,6 +6,7 @@ import type { RhymeMathResult, CategoryScore } from "../lib/types.js";
 import { getCachedResult } from "../lib/resultCache.js";
 import { apiRequest } from "../lib/queryClient.js";
 import AnalysisComments from "../components/AnalysisComments.js";
+import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
 
 function copyShareLink() {
   navigator.clipboard.writeText(window.location.href).then(() => alert("Link copied!"));
@@ -388,6 +389,41 @@ export default function Results() {
                   side="B"
                   artistName={artistB.artistName}
                 />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Community Annotations — battle (both sides) */}
+        {(result as any).resultId && artistA.verse && artistB.verse && (
+          <div style={{ marginBottom: "12px" }}>
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ ANNOTATIONS</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
+              <div style={{ border: "2px solid #1a3a7a" }}>
+                <div style={{ background: "#1a3a7a", padding: "4px 10px", fontFamily: "Courier New, monospace", fontSize: 11, color: "#fff", fontWeight: "bold" }}>
+                  A: {artistA.artistName}
+                </div>
+                <div style={{ padding: "10px" }}>
+                  <AnnotationOverlay
+                    verse={artistA.verse}
+                    comparisonId={(result as any).resultId}
+                    side="A"
+                    artistName={artistA.artistName}
+                  />
+                </div>
+              </div>
+              <div style={{ border: "2px solid #8b0000" }}>
+                <div style={{ background: "#8b0000", padding: "4px 10px", fontFamily: "Courier New, monospace", fontSize: 11, color: "#fff", fontWeight: "bold" }}>
+                  B: {artistB.artistName}
+                </div>
+                <div style={{ padding: "10px" }}>
+                  <AnnotationOverlay
+                    verse={artistB.verse}
+                    comparisonId={(result as any).resultId}
+                    side="B"
+                    artistName={artistB.artistName}
+                  />
+                </div>
               </div>
             </div>
           </div>
