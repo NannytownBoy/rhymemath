@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
-import { scoreCIDSignals, clearCIDCache } from "./scoring/cidLookup";
+import { scoreCIDSignals, clearCIDCache, getMatchedTokens } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
 import { runIntegrityCheck } from "./integrity";
@@ -989,6 +989,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ── Community (auth, annotations, admin) ──────────────────────────────────
   registerCommunityRoutes(app);
+
+  // ── POST /api/cid/tokens ───────────────────────────────────────────────────
+  // Returns CID-matched token spans for teal glow on the frontend.
+  app.post("/api/cid/tokens", async (req, res) => {
+    const { text } = req.body || {};
+    if (!text || typeof text !== "string") return res.status(400).json({ error: "text required" });
+    try {
+      const tokens = await getMatchedTokens(text);
+      res.json({ tokens });
+    } catch (e) {
+      console.error("[CID tokens]", e);
+      res.json({ tokens: [] });
+    }
+  });
 
   // ── POST /api/cid/cache-clear ────────────────────────────────────────────
   // Called by cid-auto-mine after each successful import so new entendres/punchlines

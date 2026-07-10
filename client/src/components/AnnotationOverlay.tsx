@@ -46,11 +46,37 @@ const MEANING_TYPES = [
   { value: "historical_ref", label: "Historical Reference" },
 ];
 
-export function AnnotationOverlay({ verse, analysisId, comparisonId, side, cidTokens = [], artistName }: Props) {
+export function AnnotationOverlay({ verse, analysisId, comparisonId, side, cidTokens: cidTokensProp = [], artistName }: Props) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const verseRef = useRef<HTMLDivElement>(null);
+
+  // Self-fetch CID tokens from the server so teal glow fires automatically
+  const { data: fetchedTokens = [] } = useQuery<{ token: string; label: string; layer: string }[]>({
+    queryKey: ["/api/cid/tokens", verse.slice(0, 40)],
+    queryFn: async () => {
+      const res = await fetch("/api/cid/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: verse }),
+      });
+      const data = await res.json();
+      return data.tokens ?? [];
+    },
+    enabled: verse.length > 10,
+    staleTime: 5 * 60 * 1000, // 5 min — CID doesn't change mid-session
+  });
+
+  // Merge self-fetched tokens with any explicitly passed cidTokens (legacy prop)
+  const cidTokens: CIDToken[] = [
+    ...cidTokensProp,
+    ...fetchedTokens.map(t => ({
+      term: t.token,
+      matchType: (t.layer === "entendre" ? "entendre" : t.layer === "alias" ? "alias" : "cultural") as CIDToken["matchType"],
+      meaning: t.label !== t.token ? t.label : undefined,
+    })),
+  ];
 
   const [draft, setDraft] = useState<AnnotationDraft | null>(null);
   const [form, setForm] = useState({

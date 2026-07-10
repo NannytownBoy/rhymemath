@@ -457,12 +457,13 @@ export function registerCommunityRoutes(app: Express) {
   app.get("/api/admin/stats", requireMod, async (req, res) => {
     const p = pool();
     try {
-      const [users, pending, approved, rejected, total] = await Promise.all([
+      const [users, pending, approved, rejected, total, challenged] = await Promise.all([
         p.query(`SELECT COUNT(*) as n FROM users`),
         p.query(`SELECT COUNT(*) as n FROM annotations WHERE status='pending'`),
         p.query(`SELECT COUNT(*) as n FROM annotations WHERE status='approved'`),
         p.query(`SELECT COUNT(*) as n FROM annotations WHERE status='rejected'`),
         p.query(`SELECT COUNT(*) as n FROM annotations`),
+        p.query(`SELECT COUNT(*) as n FROM annotations WHERE status='challenged'`),
       ]);
       res.json({
         totalUsers: parseInt(users.rows[0].n),
@@ -470,6 +471,7 @@ export function registerCommunityRoutes(app: Express) {
         approvedAnnotations: parseInt(approved.rows[0].n),
         rejectedAnnotations: parseInt(rejected.rows[0].n),
         totalAnnotations: parseInt(total.rows[0].n),
+        challengedAnnotations: parseInt(challenged.rows[0].n),
       });
     } finally { await p.end(); }
   });

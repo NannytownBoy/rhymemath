@@ -255,6 +255,7 @@ function StatsPanel() {
       {[
         { label: "Total Users", value: stats.totalUsers },
         { label: "Pending", value: stats.pendingAnnotations, color: "#f5c518" },
+        { label: "Flagged", value: stats.challengedAnnotations ?? 0, color: "#8b4400" },
         { label: "Approved", value: stats.approvedAnnotations, color: "#1a7a1a" },
         { label: "Rejected", value: stats.rejectedAnnotations, color: "#7a1a1a" },
         { label: "Total Annotations", value: stats.totalAnnotations },

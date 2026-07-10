@@ -71,7 +71,20 @@ const ZERO_SIGNALS: CIDScoreSignals = {
   matchedEntities: [],
 };
 
+interface CIDFigure {
+  id: number;
+  figure_name: string;
+  aliases: string[];
+  figure_type: string;
+  domains: string[];
+  cultural_context: string | null;
+  scandal_summary: string | null;
+  era: string | null;
+}
+
 interface CIDCache {
+  // Layer 0: real-world figures (people, events, scandals)
+  figures: CIDFigure[];
   // Layer 1: canonical records — term + short_anchor for direct matching
   canonicalRecords: Array<{
     record_id: string;
@@ -129,7 +142,15 @@ async function loadCIDCache(): Promise<CIDCache> {
   if (_cache) return _cache;
 
   try {
-    const [recRes, aliasRes, entendreRes, punchRes, edgeRes] = await Promise.all([
+    const [figRes, recRes, aliasRes, entendreRes, punchRes, edgeRes] = await Promise.all([
+
+      // Layer 0: real-world figures
+      pool.query(`
+        SELECT id, figure_name, aliases, figure_type, domains,
+               cultural_context, scandal_summary, era
+        FROM cid_figures
+        WHERE review_status = 'approved' AND status = 'active'
+      `),
 
       // Layer 1: canonical records — approved + active only
       pool.query(`
@@ -196,6 +217,11 @@ async function loadCIDCache(): Promise<CIDCache> {
     ]);
 
     _cache = {
+      figures: figRes.rows.map(r => ({
+        ...r,
+        aliases: Array.isArray(r.aliases) ? r.aliases : (JSON.parse(r.aliases ?? '[]')),
+        domains: Array.isArray(r.domains) ? r.domains : (JSON.parse(r.domains ?? '[]')),
+      })),
       canonicalRecords: recRes.rows,
       aliasTerms: aliasRes.rows,
       entendreAnchors: entendreRes.rows,
@@ -204,7 +230,8 @@ async function loadCIDCache(): Promise<CIDCache> {
     };
 
     console.log(
-      `[CID] Cache loaded: ${_cache.canonicalRecords.length} records, ` +
+      `[CID] Cache loaded: ${_cache.figures.length} figures, ` +
+      `${_cache.canonicalRecords.length} records, ` +
       `${_cache.aliasTerms.length} aliases, ` +
       `${_cache.entendreAnchors.length} entendres, ` +
       `${_cache.punchlineAnchors.length} punchlines, ` +
@@ -215,6 +242,7 @@ async function loadCIDCache(): Promise<CIDCache> {
   } catch (err) {
     console.error("[CID] Cache load failed (non-fatal):", err);
     return {
+      figures: [],
       canonicalRecords: [],
       aliasTerms: [],
       entendreAnchors: [],
@@ -226,6 +254,77 @@ async function loadCIDCache(): Promise<CIDCache> {
 
 export function clearCIDCache() {
   _cache = null;
+}
+
+/**
+ * getMatchedTokens
+ * Returns all CID-matched surface forms found in the verse text.
+ * Used by the /api/cid/tokens endpoint to drive teal glow on the frontend.
+ * Deduplicates by matched string (case-insensitive).
+ */
+export async function getMatchedTokens(
+  verse: string
+): Promise<{ token: string; label: string; layer: "canonical" | "alias" | "entendre" | "punchline" }[]> {
+  if (!verse || verse.trim().length < 10) return [];
+  const cache = await loadCIDCache();
+  const verseLower = verse.toLowerCase();
+  const seen = new Set<string>();
+  const results: { token: string; label: string; layer: "canonical" | "alias" | "entendre" | "punchline" }[] = [];
+
+  const add = (token: string, label: string, layer: "canonical" | "alias" | "entendre" | "punchline") => {
+    const key = token.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); results.push({ token, label, layer }); }
+  };
+
+  // Layer 0: real-world figures
+  for (const fig of cache.figures) {
+    const allNames = [fig.figure_name, ...fig.aliases];
+    const matchedName = allNames.find(name => name.length >= 3 && wholeWord(name).test(verseLower));
+    if (matchedName) add(matchedName, fig.figure_name, "canonical");
+  }
+
+  // Layer 1: canonical records
+  for (const rec of cache.canonicalRecords) {
+    let matchedToken: string | null = null;
+    if (rec.term && rec.term.length >= 3) {
+      const isHR = rec.term.toLowerCase() in HIGH_RISK_ALIASES;
+      if (isHR ? highRiskAliasMatches(verseLower, rec.term) : wholeWord(rec.term).test(verseLower))
+        matchedToken = rec.term;
+    }
+    if (!matchedToken && rec.short_anchor && rec.short_anchor.length >= 5) {
+      if (verseLower.includes(rec.short_anchor.toLowerCase()))
+        matchedToken = rec.short_anchor;
+    }
+    if (matchedToken) add(matchedToken, rec.display_label || rec.term, "canonical");
+  }
+
+  // Layer 2: aliases
+  for (const alias of cache.aliasTerms) {
+    if (!alias.alias_text || alias.alias_text.length < 2) continue;
+    const isHR = alias.alias_text.toLowerCase() in HIGH_RISK_ALIASES;
+    const hit = isHR
+      ? highRiskAliasMatches(verseLower, alias.alias_text)
+      : wholeWord(alias.alias_text).test(verseLower);
+    if (hit) add(alias.alias_text, alias.canonical_label, "alias");
+  }
+
+  // Layer 3: entendres
+  for (const ent of cache.entendreAnchors) {
+    const anchor = (ent.short_anchor || ent.anchor || "").trim();
+    if (anchor.length < 4) continue;
+    if (verseLower.includes(anchor.toLowerCase()) || new RegExp(escapeRegex(anchor), "i").test(verseLower))
+      add(anchor, anchor, "entendre");
+  }
+
+  // Layer 4: punchlines
+  for (const punch of cache.punchlineAnchors) {
+    const anchor = (punch.short_anchor || punch.setup_anchor || "").trim();
+    if (anchor.length < 5) continue;
+    if (verseLower.includes(anchor.toLowerCase()) || new RegExp(escapeRegex(anchor), "i").test(verseLower))
+      add(anchor, anchor, "punchline");
+  }
+
+  return results;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -279,7 +378,24 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
     const matchedRecordIds = new Set<string>();
     const matchedEntityLabels: string[] = [];
 
-    // ── LAYER 1: Canonical Records ────────────────────────────────────────────
+    // ── LAYER 0: Real-World Figures ──────────────────────────────────────────
+    // Match cid_figures by primary name + all aliases (people, scandals, events)
+    let figureMatches = 0;
+    for (const fig of cache.figures) {
+      const allNames = [fig.figure_name, ...fig.aliases];
+      const hit = allNames.some(name => name.length >= 3 && wholeWord(name).test(verseLower));
+      if (hit) {
+        const key = `fig_${fig.id}`;
+        if (!matchedRecordIds.has(key)) {
+          matchedRecordIds.add(key);
+          matchedEntityLabels.push(fig.figure_name);
+          figureMatches++;
+          evidence.push(`CID figure: "${fig.figure_name}"${fig.scandal_summary ? ` — ${fig.scandal_summary.slice(0, 60)}...` : ''}`);
+        }
+      }
+    }
+
+        // ── LAYER 1: Canonical Records ────────────────────────────────────────────
     // Match against term, short_anchor, and display_label of approved records
     let canonicalMatches = 0;
     for (const rec of cache.canonicalRecords) {
@@ -329,8 +445,8 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
       }
     }
 
-    // Combined cultural reference density across layers 1 + 2
-    const totalRefMatches = canonicalMatches + aliasMatches;
+    // Combined cultural reference density across layers 0 + 1 + 2
+    const totalRefMatches = figureMatches + canonicalMatches + aliasMatches;
     // Density denominator: 0.15 means 2 hits in a 16-line verse = density 0.83
     // Tuned to approximate the "oh shit" recognition threshold —
     // even 1-2 authentic cultural hits in a verse is a meaningful signal
