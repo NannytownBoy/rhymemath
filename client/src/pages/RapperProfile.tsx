@@ -1,7 +1,103 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
+import { useState } from "react";
 import { SingleScoreBar } from "../components/ScoreBar.js";
 import { apiRequest } from "@/lib/queryClient";
+import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
+
+// ── Expandable analyzed tracks with inline AnnotationOverlay ────────────────
+function AnalyzedTracksList({ tracks, artistName }: { tracks: any[]; artistName: string }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  return (
+    <div style={{ border: "1px solid #bbbbbb", background: "#fff", marginBottom: "12px" }}>
+      <div className="rm-section-header" style={{ margin: 0 }}>[ ANALYZED TRACKS ]</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Arial, sans-serif", fontSize: "12px" }}>
+        <thead>
+          <tr style={{ background: "#e0e8ff" }}>
+            <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>#</th>
+            <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Song / Verse</th>
+            <th style={{ padding: "5px 14px", textAlign: "right", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tracks.map((track, i) => {
+            const isOpen = expanded === track.resultId;
+            return (
+              <>
+                <tr key={track.resultId ?? i}
+                  style={{ background: i % 2 === 0 ? "#ffffff" : "#f5f3ef", cursor: track.resultId ? "pointer" : "default" }}
+                  onClick={() => track.resultId && setExpanded(isOpen ? null : track.resultId)}
+                >
+                  <td style={{ padding: "5px 14px", borderBottom: isOpen ? "none" : "1px solid #e8e8e8", fontFamily: "Courier New, monospace", color: "#999", width: "32px" }}>
+                    {i + 1}.
+                  </td>
+                  <td style={{ padding: "5px 14px", borderBottom: isOpen ? "none" : "1px solid #e8e8e8" }}>
+                    <span style={{ color: "#1a3a7a", textDecoration: track.resultId ? "underline" : "none" }}>{track.song}</span>
+                    {track.resultId && (
+                      <span style={{ fontFamily: "Courier New, monospace", fontSize: "9px", color: "#888", marginLeft: "8px" }}>
+                        {isOpen ? "[collapse ▼]" : "[annotate ▶]"}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: "5px 14px", textAlign: "right", borderBottom: isOpen ? "none" : "1px solid #e8e8e8",
+                    fontFamily: "Courier New, monospace", fontWeight: "bold",
+                    color: track.score >= 80 ? "#006600" : track.score >= 65 ? "#1a3a7a" : "#8b0000" }}>
+                    {track.score.toFixed(1)}
+                  </td>
+                </tr>
+                {isOpen && track.resultId && (
+                  <tr key={`${track.resultId}-expand`}>
+                    <td colSpan={3} style={{ padding: "0 0 12px 0", borderBottom: "2px solid #1a3a7a" }}>
+                      <TrackAnnotationPanel resultId={track.resultId} artistName={artistName} />
+                    </td>
+                  </tr>
+                )}
+              </>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TrackAnnotationPanel({ resultId, artistName }: { resultId: string; artistName: string }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["/api/analysis", resultId],
+    queryFn: async () => {
+      const res = await fetch(`/api/analysis/${resultId}`);
+      const data = await res.json();
+      if (data.resultJson && typeof data.resultJson === "string") return JSON.parse(data.resultJson);
+      return data;
+    },
+  });
+
+  if (isLoading) return (
+    <div style={{ padding: "16px", fontFamily: "Courier New, monospace", fontSize: 11, color: "#888" }}>Loading verse...</div>
+  );
+  if (!data?.verse) return (
+    <div style={{ padding: "16px", fontFamily: "Courier New, monospace", fontSize: 11, color: "#888" }}>Verse not available.</div>
+  );
+
+  return (
+    <div style={{ padding: "12px 14px", borderTop: "1px solid #ddd" }}>
+      <div style={{ fontFamily: "Courier New, monospace", fontSize: 10, color: "#888", marginBottom: 8 }}>
+        {data.songName}{data.verseLabel ? ` — ${data.verseLabel}` : ""} · Score: {data.scores?.overall?.toFixed(1)}
+      </div>
+      <AnnotationOverlay
+        verse={data.verse}
+        analysisId={resultId}
+        artistName={artistName}
+      />
+      <div style={{ marginTop: 10 }}>
+        <a href={`/#/analysis/${resultId}`} style={{ fontFamily: "Courier New, monospace", fontSize: 10, color: "#1a3a7a" }}>
+          View full breakdown ▶
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function timeAgo(ts: number) {
   const diff = Date.now() - ts;
@@ -302,53 +398,9 @@ export default function RapperProfile() {
           </div>
         )}
 
-        {/* Analyzed Tracks — solo analyses from DB */}
+        {/* Analyzed Tracks — expandable with inline annotation */}
         {analyzedTracks.length > 0 && (
-          <div style={{ border: "1px solid #bbbbbb", background: "#fff", marginBottom: "12px" }}>
-            <div className="rm-section-header" style={{ margin: 0 }}>[ ANALYZED TRACKS ]</div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Arial, sans-serif", fontSize: "12px" }}>
-              <thead>
-                <tr style={{ background: "#e0e8ff" }}>
-                  <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>#</th>
-                  <th style={{ padding: "5px 14px", textAlign: "left", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Song / Verse</th>
-                  <th style={{ padding: "5px 14px", textAlign: "right", fontWeight: "bold", color: "#1a3a7a", fontSize: "11px", borderBottom: "1px solid #bbbbbb" }}>Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analyzedTracks.map((track, i) => (
-                  <tr
-                    key={i}
-                    style={{
-                      background: i % 2 === 0 ? "#ffffff" : "#f5f3ef",
-                      cursor: track.resultId ? "pointer" : "default",
-                    }}
-                    onClick={() => track.resultId && (window.location.hash = `/results/${track.resultId}`)}
-                    title={track.resultId ? "Click to view full breakdown" : undefined}
-                  >
-                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", color: "#999", width: "32px" }}>
-                      {i + 1}.
-                    </td>
-                    <td style={{ padding: "5px 14px", borderBottom: "1px solid #e8e8e8" }}>
-                      {track.resultId ? (
-                        <span style={{ color: "#1a3a7a", textDecoration: "underline" }}>{track.song}</span>
-                      ) : (
-                        <span style={{ color: "#222" }}>{track.song}</span>
-                      )}
-                      {track.resultId && (
-                        <span style={{ fontFamily: "Courier New, monospace", fontSize: "9px", color: "#1a3a7a", marginLeft: "6px" }}>
-                          [view breakdown ▶]
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: "5px 14px", textAlign: "right", borderBottom: "1px solid #e8e8e8", fontFamily: "Courier New, monospace", fontWeight: "bold",
-                      color: track.score >= 80 ? "#006600" : track.score >= 65 ? "#1a3a7a" : "#8b0000" }}>
-                      {track.score.toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AnalyzedTracksList tracks={analyzedTracks} artistName={profile.name} />
         )}
 
         {/* CTA */}
