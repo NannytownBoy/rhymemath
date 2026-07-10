@@ -11,6 +11,7 @@ import {
   type JWTPayload,
 } from "./auth";
 import { POINTS } from "@shared/schema";
+import { clearCIDCache } from "./scoring/cidLookup";
 
 const DB = process.env.DATABASE_URL!;
 
@@ -473,6 +474,92 @@ export function registerCommunityRoutes(app: Express) {
         totalAnnotations: parseInt(total.rows[0].n),
         challengedAnnotations: parseInt(challenged.rows[0].n),
       });
+    } finally { await p.end(); }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CID FIGURES — community submission + admin review
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // POST /api/figures/submit — any logged-in user flags a missing cultural figure
+  app.post("/api/figures/submit", requireAuth, async (req, res) => {
+    const { figureName, figureType = "person", domains = [], culturalContext, scandalSummary, era, exampleLyric } = req.body || {};
+    if (!figureName?.trim()) return res.status(400).json({ error: "figureName required" });
+    const p = pool();
+    try {
+      // Check for near-duplicate
+      const exists = await p.query(
+        `SELECT id FROM cid_figures WHERE LOWER(figure_name) = LOWER($1) LIMIT 1`,
+        [figureName.trim()]
+      );
+      if (exists.rows[0]) return res.status(409).json({ error: "Figure already exists in CID" });
+
+      await p.query(`
+        INSERT INTO cid_figures
+          (figure_name, figure_type, domains, cultural_context, scandal_summary, era, source, review_status, submitted_by)
+        VALUES ($1,$2,$3,$4,$5,$6,'community','candidate',$7)
+      `, [
+        figureName.trim(),
+        figureType,
+        JSON.stringify(domains),
+        culturalContext?.trim() || null,
+        scandalSummary?.trim() || null,
+        era?.trim() || null,
+        (req as any).user.userId,
+      ]);
+
+      // Award points for the gap submission
+      await awardPoints(p, (req as any).user.userId, 10, "figure_submitted", null);
+
+      // Store example lyric as a note if provided
+      if (exampleLyric?.trim()) {
+        await p.query(
+          `UPDATE cid_figures SET cultural_context = COALESCE(cultural_context || E'\n\nExample lyric: ', 'Example lyric: ') || $1
+           WHERE LOWER(figure_name) = LOWER($2)`,
+          [exampleLyric.trim(), figureName.trim()]
+        );
+      }
+
+      res.json({ success: true, message: "Figure flagged for review (+10 pts)" });
+    } finally { await p.end(); }
+  });
+
+  // GET /api/admin/figures — list candidate figures for mod review
+  app.get("/api/admin/figures", requireMod, async (req, res) => {
+    const { status = "candidate" } = req.query;
+    const p = pool();
+    try {
+      const result = await p.query(
+        `SELECT f.*, u.username AS submitted_by_username
+         FROM cid_figures f
+         LEFT JOIN users u ON u.id = f.submitted_by
+         WHERE f.review_status = $1
+         ORDER BY f.created_at ASC`,
+        [status]
+      );
+      res.json(result.rows);
+    } finally { await p.end(); }
+  });
+
+  // PATCH /api/admin/figures/:id — approve or reject a submitted figure
+  app.patch("/api/admin/figures/:id", requireMod, async (req, res) => {
+    const { status } = req.body || {};
+    if (!["approved", "rejected"].includes(status)) return res.status(400).json({ error: "status must be approved or rejected" });
+    const p = pool();
+    try {
+      const fig = await p.query(`SELECT * FROM cid_figures WHERE id=$1`, [req.params.id]);
+      if (!fig.rows[0]) return res.status(404).json({ error: "Not found" });
+      await p.query(
+        `UPDATE cid_figures SET review_status=$1, reviewed_by=$2, updated_at=NOW() WHERE id=$3`,
+        [status, (req as any).user.username, req.params.id]
+      );
+      // Award bonus if approved and submitted by a community user
+      if (status === "approved" && fig.rows[0].submitted_by) {
+        await awardPoints(p, fig.rows[0].submitted_by, 50, "figure_approved", null);
+      }
+      // Clear CID cache so the new figure fires immediately
+      clearCIDCache();
+      res.json({ success: true });
     } finally { await p.end(); }
   });
 }

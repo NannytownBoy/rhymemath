@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { getToken } from "../lib/auth";
 import { useLocation } from "wouter";
 import { ChallengeForm } from "./ChallengeForm";
+import { FigureSubmitForm } from "./FigureSubmitForm";
 
 const MONO = "Courier New, monospace";
 const BLUE = "#1a3a7a";
@@ -324,6 +325,9 @@ export function AnnotationOverlay({ verse, analysisId, comparisonId, side, cidTo
           You have {pending.filter((a: any) => a.submitted_by === user.id).length} pending annotation(s) under review.
         </div>
       )}
+
+      {/* Flag missing cultural reference */}
+      <FigureSubmitForm exampleLyric={draft?.anchorText ?? ""} />
     </div>
   );
 }

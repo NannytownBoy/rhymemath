@@ -15,7 +15,7 @@ function authFetch(url: string, opts: RequestInit = {}) {
   }).then(r => r.json());
 }
 
-type Tab = "queue" | "users" | "stats";
+type Tab = "queue" | "figures" | "users" | "stats";
 
 export default function Admin() {
   const { user, isMod, isAdmin } = useAuth();
@@ -44,16 +44,17 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 2, marginBottom: 20 }}>
-        {(["queue", "users", "stats"] as Tab[]).map(t => (
+        {(["queue", "figures", "users", "stats"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             fontFamily: MONO, fontSize: 12, padding: "6px 16px",
             background: tab === t ? BLUE : "#eee", color: tab === t ? "#fff" : "#333",
             border: "1px solid #ccc", cursor: "pointer", textTransform: "uppercase",
-          }}>{t}</button>
+          }}>{t === "figures" ? "CID Figures" : t}</button>
         ))}
       </div>
 
       {tab === "queue" && <AnnotationQueue statusFilter={statusFilter} setStatusFilter={setStatusFilter} />}
+      {tab === "figures" && <FiguresQueue />}
       {tab === "users" && isAdmin && <UserManager />}
       {tab === "users" && !isAdmin && <div style={{ fontFamily: MONO, color: "#888" }}>Admin only.</div>}
       {tab === "stats" && <StatsPanel />}
@@ -263,6 +264,89 @@ function StatsPanel() {
         <div key={s.label} style={statStyle}>
           <div style={{ fontFamily: MONO, fontSize: 28, fontWeight: "bold", color: s.color || BLUE }}>{s.value}</div>
           <div style={{ fontFamily: MONO, fontSize: 11, color: "#666", marginTop: 4 }}>{s.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── CID Figures review queue ────────────────────────────────────────────────
+function FiguresQueue() {
+  const [statusFilter, setStatusFilter] = useState("candidate");
+  const qc = useQueryClient();
+
+  const { data: figures = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/figures", statusFilter],
+    queryFn: () => authFetch(`/api/admin/figures?status=${statusFilter}`),
+    refetchInterval: 15000,
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      authFetch(`/api/admin/figures/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/figures"] }),
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {["candidate", "approved", "rejected"].map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)} style={{
+            fontFamily: MONO, fontSize: 11, padding: "4px 12px",
+            background: statusFilter === s ? BLUE : "#eee",
+            color: statusFilter === s ? "#fff" : "#333",
+            border: "1px solid #ccc", cursor: "pointer",
+          }}>{s.toUpperCase()}</button>
+        ))}
+      </div>
+
+      {figures.length === 0 && (
+        <div style={{ fontFamily: MONO, fontSize: 12, color: "#888", padding: 20 }}>No {statusFilter} figures.</div>
+      )}
+
+      {figures.map((fig: any) => (
+        <div key={fig.id} style={{ border: "1px solid #ddd", padding: "12px 16px", marginBottom: 12, background: "#fff" }}>
+          <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: "bold", color: BLUE, marginBottom: 4 }}>
+            {fig.figure_name}
+            <span style={{ fontWeight: "normal", fontSize: 10, color: "#888", marginLeft: 8 }}>
+              {fig.figure_type} · {fig.era || "era unknown"}
+            </span>
+          </div>
+          {fig.submitted_by_username && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "#888", marginBottom: 6 }}>Submitted by: {fig.submitted_by_username}</div>
+          )}
+          {(Array.isArray(fig.domains) ? fig.domains : JSON.parse(fig.domains ?? '[]')).length > 0 && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "#555", marginBottom: 6 }}>
+              Domains: {(Array.isArray(fig.domains) ? fig.domains : JSON.parse(fig.domains ?? '[]')).join(", ")}
+            </div>
+          )}
+          {fig.cultural_context && (
+            <div style={{ fontFamily: MONO, fontSize: 11, color: "#333", marginBottom: 6, paddingLeft: 8, borderLeft: "2px solid #ddd" }}>
+              {fig.cultural_context}
+            </div>
+          )}
+          {fig.scandal_summary && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "#666", marginBottom: 6, fontStyle: "italic" }}>
+              {fig.scandal_summary}
+            </div>
+          )}
+          {statusFilter === "candidate" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={() => reviewMutation.mutate({ id: fig.id, status: "approved" })}
+                style={{ fontFamily: MONO, fontSize: 11, padding: "4px 14px", background: "#1a7a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                ✓ APPROVE (+50 pts submitter)
+              </button>
+              <button onClick={() => reviewMutation.mutate({ id: fig.id, status: "rejected" })}
+                style={{ fontFamily: MONO, fontSize: 11, padding: "4px 14px", background: "#7a1a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                ✗ REJECT
+              </button>
+            </div>
+          )}
+          {statusFilter !== "candidate" && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: statusFilter === "approved" ? "#007700" : "#cc0000", marginTop: 6 }}>
+              {statusFilter.toUpperCase()}{fig.reviewed_by ? ` by ${fig.reviewed_by}` : ""}
+            </div>
+          )}
         </div>
       ))}
     </div>

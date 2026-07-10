@@ -832,10 +832,13 @@ async function mineText(text, songTitle, artistName) {
     records.push(rec);
   }
 
-  // ── AI entendre + punchline extraction (same song text, zero extra API cost) ──
-  const { entendres, punchlines } = await extractWordplayFromText(text, songTitle, artistName || "this artist");
+  // ── AI entendre + punchline + figures extraction (same song text, zero extra API cost) ──
+  const [{ entendres, punchlines }, figures] = await Promise.all([
+    extractWordplayFromText(text, songTitle, artistName || "this artist"),
+    extractFiguresFromText(text, songTitle, artistName || "this artist"),
+  ]);
 
-  return { records, aliases, entendres, punchlines };
+  return { records, aliases, entendres, punchlines, figures };
 }
 
 // ── Entendre + punchline extractor (one AI call per song) ────────────────────
@@ -959,6 +962,56 @@ ${snippet}`;
   }
 }
 
+// ── Real-world figures extractor (runs in parallel with wordplay, zero extra net cost) ──
+async function extractFiguresFromText(text, songTitle, artistName) {
+  try {
+    const prompt = `You are a hip-hop cultural analyst. Read these lyrics and identify any references to real-world NAMED people, events, or brands that a rap listener would recognize as a cultural reference (not general nouns).
+
+Return ONLY a JSON array. Each item:
+{
+  "figure_name": "exact name as written in lyrics",
+  "figure_type": "person" | "event" | "place" | "brand" | "scandal",
+  "domains": ["religion"|"politics"|"sports"|"music"|"crime"|"entertainment"|"media"|"business"],
+  "era": "e.g. 2020s or 1990s-2000s",
+  "cultural_context": "1-2 sentences: why this name appears in rap and what it signals",
+  "scandal_summary": "if this person/event has a controversy that rappers reference, describe it briefly",
+  "example_lyric": "the exact line or phrase from the lyrics"
+}
+
+Rules:
+- Only include NAMED real people/events (not generic terms like 'the president')
+- Exclude the artist themselves and their obvious collaborators
+- Exclude fictional characters
+- Minimum confidence: you must be >80% sure this is an intentional cultural reference
+- Return [] if no qualifying figures found
+- Do NOT wrap in markdown or code blocks
+
+Song: "${songTitle}" by ${artistName}
+
+Lyrics:
+${text.slice(0, 3000)}`;
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 800,
+      }),
+    });
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? "[]";
+    const parsed = JSON.parse(raw.replace(/^```json|```$/g, "").trim());
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(f => f.figure_name && f.figure_name.length >= 2);
+  } catch (e) {
+    console.warn(`  [AI-figures] failed (non-fatal): ${e.message}`);
+    return [];
+  }
+}
+
 async function main() {
   console.log(`\n╔═══════════════════════════════════════════════════╗`);
   console.log(`║  PH Labs CID Lyric Miner                          ║`);
@@ -969,6 +1022,7 @@ async function main() {
   const allAliases = [];
   const allEntendres = [];
   const allPunchlines = [];
+  const allFigures = [];
   const allTexts = [];
 
   // ── Source: local file ───────────────────────────────────────────────────
@@ -976,12 +1030,13 @@ async function main() {
     console.log(`Reading local file: ${LOCAL_FILE}`);
     const text = fs.readFileSync(LOCAL_FILE, "utf8");
     allTexts.push(text);
-    const { records, aliases, entendres, punchlines } = await mineText(text, path.basename(LOCAL_FILE), artist);
+    const { records, aliases, entendres, punchlines, figures } = await mineText(text, path.basename(LOCAL_FILE), artist);
     allRecords.push(...records);
     allAliases.push(...aliases);
     allEntendres.push(...entendres);
     allPunchlines.push(...punchlines);
-    console.log(`  Found ${records.length} candidate records, ${entendres.length} entendres, ${punchlines.length} punchlines\n`);
+    allFigures.push(...(figures || []));
+    console.log(`  Found ${records.length} candidate records, ${entendres.length} entendres, ${punchlines.length} punchlines, ${(figures||[]).length} figures\n`);
   }
 
   // ── Source: Genius API ───────────────────────────────────────────────────
@@ -1092,6 +1147,8 @@ async function main() {
   writeCSV(aliasesFile, allAliases);
   if (allEntendres.length) writeCSV(entendresFile, allEntendres);
   if (allPunchlines.length) fs.writeFileSync(puchlinesFile, JSON.stringify(allPunchlines, null, 2), "utf8");
+  const figuresFile = path.join(OUT_DIR, `v5_4_figures.json`);
+  if (allFigures.length) fs.writeFileSync(figuresFile, JSON.stringify(allFigures, null, 2), "utf8");
 
   console.log(`\n─────────────────────────────────────────────────────`);
   console.log(`  Mining complete`);
@@ -1099,6 +1156,7 @@ async function main() {
   console.log(`  Aliases found:   ${allAliases.length}`);
   console.log(`  Entendres found: ${allEntendres.length}`);
   console.log(`  Punchlines found:${allPunchlines.length}`);
+  console.log(`  Figures found:   ${allFigures.length}`);
   console.log(`  Output dir:      ${OUT_DIR}`);
   console.log(`─────────────────────────────────────────────────────`);
   console.log(`\nNext steps:`);

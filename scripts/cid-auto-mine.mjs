@@ -324,9 +324,12 @@ async function main() {
   });
 
   // Cooldown: skip artists mined recently
-  // COOLDOWN_DAYS env var overrides default (set to 0 for round-the-clock mining)
-  const COOLDOWN_DAYS = parseFloat(process.env.COOLDOWN_DAYS ?? '3');
-  const FORCE_ALL = process.env.FORCE_ALL === '1' || COOLDOWN_DAYS === 0;
+  // CONTINUOUS=1  → bypass entirely (same as COOLDOWN_DAYS=0)
+  // COOLDOWN_DAYS  → override default 3-day window
+  // FORCE_ALL=1   → explicit bypass flag
+  const CONTINUOUS = process.env.CONTINUOUS === '1';
+  const COOLDOWN_DAYS = CONTINUOUS ? 0 : parseFloat(process.env.COOLDOWN_DAYS ?? '3');
+  const FORCE_ALL = process.env.FORCE_ALL === '1' || COOLDOWN_DAYS === 0 || CONTINUOUS;
 
   let artists;
   if (FORCE_ALL) {
@@ -378,6 +381,36 @@ async function main() {
         continue;
       }
       totalNewRecords += newRecordCount;
+    }
+
+    // Import figures extracted by lyric-miner
+    const figuresFile = path.join(outDir, "v5_4_figures.json");
+    if (!DRY_RUN && fs.existsSync(figuresFile)) {
+      try {
+        const rawFigs = JSON.parse(fs.readFileSync(figuresFile, "utf8"));
+        let figCount = 0;
+        for (const fig of rawFigs) {
+          if (!fig.figure_name) continue;
+          // Upsert as candidate (never auto-approve miner output)
+          await pool.query(`
+            INSERT INTO cid_figures
+              (figure_name, figure_type, domains, cultural_context, scandal_summary, era, source, review_status)
+            VALUES ($1,$2,$3,$4,$5,$6,'miner','candidate')
+            ON CONFLICT (figure_name) DO NOTHING
+          `, [
+            fig.figure_name.trim(),
+            fig.figure_type || 'person',
+            JSON.stringify(fig.domains || []),
+            fig.cultural_context || null,
+            fig.scandal_summary || null,
+            fig.era || null,
+          ]);
+          figCount++;
+        }
+        if (figCount > 0) console.log(`  ➕ ${figCount} figure candidate(s) queued for CID review`);
+      } catch (e) {
+        console.warn(`  figures import skipped: ${e.message}`);
+      }
     }
 
     await logMine(pool, artist.name, DRY_RUN ? "dry_run" : "success", newRecordCount);
