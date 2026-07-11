@@ -883,7 +883,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Solo analyses — contribute to score averages and track list, not W/L
-      for (const a of matchedAnalyses) {
+      // Exclude non-verse sections (hook/chorus/intro/outro/bridge/spoken/unknown)
+      const NON_VERSE = new Set(["hook","chorus","pre_hook","bridge","interlude","intro","outro","spoken","unknown"]);
+      const verseOnlyAnalyses = matchedAnalyses.filter(a =>
+        a.scoreOverall != null &&
+        !NON_VERSE.has((a.sectionLabel ?? "").toLowerCase())
+      );
+      for (const a of verseOnlyAnalyses) {
         const overall = a.scoreOverall ?? 0;
         totalFlow += a.scoreFlow ?? 0;
         totalWordplay += a.scoreWordplay ?? 0;

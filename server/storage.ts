@@ -129,7 +129,12 @@ export class DatabaseStorage implements IStorage {
       db.select().from(analyses),
     ]);
     const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard" || c.scoringMode.startsWith("standard-"));
-    const standardAnalyses = allAnalyses.filter(a => !a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-"));
+    const NON_VERSE_LABELS = new Set(["hook","chorus","pre_hook","bridge","interlude","intro","outro","spoken","unknown"]);
+    const standardAnalyses = allAnalyses.filter(a =>
+      (!a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-")) &&
+      a.scoreOverall != null &&
+      !NON_VERSE_LABELS.has((a.sectionLabel ?? "").toLowerCase())
+    );
 
     // Title-case helper for display names
     const CANONICAL_NAMES: Record<string,string> = {
