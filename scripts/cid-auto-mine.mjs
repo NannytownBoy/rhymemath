@@ -160,6 +160,143 @@ const APPROVED_ARTISTS = [
   { name: "Big Noyd",            songs: 6,  priority: 3 },
   { name: "Cormega",             songs: 6,  priority: 2 },
   { name: "Nature",              songs: 6,  priority: 3 },
+
+  // ── Wave 3 ────────────────────────────────────────────────────────────────
+
+  // NYC / East Coast depth
+  { name: "Rakim",               songs: 10, priority: 1 },
+  { name: "Big L",               songs: 10, priority: 1 },
+  { name: "Big Pun",             songs: 10, priority: 1 },
+  { name: "Fat Joe",             songs: 8,  priority: 2 },
+  { name: "Kool G Rap",          songs: 8,  priority: 1 },
+  { name: "Queensbridge",        songs: 6,  priority: 2 },
+  { name: "Tragedy Khadafi",     songs: 6,  priority: 2 },
+  { name: "Capone-N-Noreaga",    songs: 6,  priority: 2 },
+  { name: "Heltah Skeltah",      songs: 6,  priority: 2 },
+  { name: "Smif-N-Wessun",       songs: 6,  priority: 2 },
+  { name: "Black Moon",          songs: 6,  priority: 2 },
+  { name: "Masta Ace",           songs: 8,  priority: 2 },
+  { name: "O.C.",                songs: 6,  priority: 2 },
+  { name: "Chino XL",            songs: 6,  priority: 2 },
+  { name: "Saigon",              songs: 6,  priority: 2 },
+  { name: "Papoose",             songs: 6,  priority: 2 },
+  { name: "Joell Ortiz",         songs: 6,  priority: 2 },
+
+  // LOX / Yonkers
+  { name: "Jadakiss",            songs: 8,  priority: 2 },
+
+  // Dipset depth
+  { name: "Hell Rell",           songs: 6,  priority: 3 },
+  { name: "Jha Jha",             songs: 4,  priority: 3 },
+
+  // Roc-A-Fella era
+  { name: "Beanie Sigel",        songs: 8,  priority: 2 },
+  { name: "Memphis Bleek",       songs: 6,  priority: 3 },
+  { name: "Peedi Crakk",         songs: 6,  priority: 3 },
+
+  // Bad Boy era
+  { name: "Lil Kim",             songs: 8,  priority: 2 },
+  { name: "Ma$e",                songs: 6,  priority: 3 },
+  { name: "Black Rob",           songs: 6,  priority: 3 },
+
+  // Death Row / West Coast golden era
+  { name: "2Pac",                songs: 10, priority: 1 },
+  { name: "Dr. Dre",             songs: 8,  priority: 1 },
+  { name: "Kurupt",              songs: 8,  priority: 2 },
+  { name: "Daz Dillinger",       songs: 6,  priority: 3 },
+  { name: "Xzibit",              songs: 6,  priority: 2 },
+  { name: "Tha Dogg Pound",      songs: 6,  priority: 2 },
+  { name: "MC Eiht",             songs: 6,  priority: 2 },
+  { name: "Spice 1",             songs: 6,  priority: 2 },
+  { name: "Brotha Lynch Hung",   songs: 6,  priority: 2 },
+
+  // Bay Area
+  { name: "Richie Rich",         songs: 6,  priority: 3 },
+  { name: "San Quinn",           songs: 6,  priority: 3 },
+  { name: "Equipto",             songs: 6,  priority: 3 },
+
+  // Houston depth
+  { name: "Bun B",               songs: 8,  priority: 1 },
+  { name: "Pimp C",              songs: 8,  priority: 1 },
+  { name: "Slim Thug",           songs: 6,  priority: 2 },
+  { name: "Paul Wall",           songs: 6,  priority: 3 },
+  { name: "Chamillionaire",      songs: 6,  priority: 2 },
+  { name: "Trae the Truth",      songs: 6,  priority: 2 },
+  { name: "Big Moe",             songs: 6,  priority: 3 },
+
+  // New Orleans
+  { name: "Juvenile",            songs: 8,  priority: 2 },
+  { name: "Lil Wayne",           songs: 10, priority: 1 },
+  { name: "Birdman",             songs: 6,  priority: 3 },
+  { name: "Turk",                songs: 6,  priority: 3 },
+
+  // Atlanta depth
+  { name: "Ludacris",            songs: 8,  priority: 2 },
+  { name: "Lil Jon",             songs: 6,  priority: 3 },
+  { name: "Crime Mob",           songs: 6,  priority: 3 },
+  { name: "Killer Mike",         songs: 8,  priority: 1 },
+  { name: "El-P",                songs: 8,  priority: 1 },
+  { name: "Future",              songs: 8,  priority: 2 },
+  { name: "Young Thug",          songs: 8,  priority: 2 },
+  { name: "Quavo",               songs: 6,  priority: 3 },
+  { name: "Offset",              songs: 6,  priority: 3 },
+  { name: "Takeoff",             songs: 6,  priority: 3 },
+  { name: "Lil Baby",            songs: 8,  priority: 2 },
+  { name: "Gunna",               songs: 6,  priority: 3 },
+  { name: "Playboi Carti",       songs: 6,  priority: 3 },
+
+  // Chicago
+  { name: "Common",              songs: 8,  priority: 1 },
+  { name: "Chance the Rapper",   songs: 8,  priority: 2 },
+  { name: "Saba",                songs: 6,  priority: 2 },
+  { name: "Noname",              songs: 6,  priority: 2 },
+  { name: "Mick Jenkins",        songs: 6,  priority: 2 },
+  { name: "G Herbo",             songs: 6,  priority: 2 },
+  { name: "Polo G",              songs: 6,  priority: 3 },
+  { name: "Lil Durk",            songs: 6,  priority: 3 },
+
+  // Detroit depth
+  { name: "Big Proof",           songs: 6,  priority: 2 },
+  { name: "Elzhi",               songs: 6,  priority: 2 },
+  { name: "Black Milk",          songs: 6,  priority: 2 },
+  { name: "Guilty Simpson",      songs: 6,  priority: 3 },
+  { name: "Dej Loaf",            songs: 6,  priority: 3 },
+
+  // Midwest / other regions
+  { name: "Tech N9ne",           songs: 8,  priority: 2 },
+  { name: "Brotha Lynch Hung",   songs: 6,  priority: 2 },
+  { name: "Rittz",               songs: 6,  priority: 3 },
+  { name: "Atmosphere",          songs: 6,  priority: 2 },
+  { name: "Brother Ali",         songs: 6,  priority: 2 },
+
+  // UK rap / grime (crossover artists)
+  { name: "Giggs",               songs: 6,  priority: 3 },
+  { name: "Skepta",              songs: 6,  priority: 3 },
+  { name: "Stormzy",             songs: 6,  priority: 3 },
+
+  // Women in rap
+  { name: "Nicki Minaj",         songs: 8,  priority: 2 },
+  { name: "Cardi B",             songs: 6,  priority: 3 },
+  { name: "Rapsody",             songs: 6,  priority: 2 },
+  { name: "Jean Grae",           songs: 6,  priority: 2 },
+  { name: "Bahamadia",           songs: 6,  priority: 2 },
+  { name: "MC Lyte",             songs: 8,  priority: 1 },
+  { name: "Queen Latifah",       songs: 6,  priority: 2 },
+
+  // Conscious / underground
+  { name: "Talib Kweli",         songs: 8,  priority: 1 },
+  { name: "Immortal Technique",  songs: 8,  priority: 1 },
+  { name: "Killer Mike",         songs: 8,  priority: 1 },
+  { name: "Aesop Rock",          songs: 8,  priority: 2 },
+  { name: "Eyedea",              songs: 6,  priority: 2 },
+  { name: "Slug",                songs: 6,  priority: 3 },
+  { name: "Sage Francis",        songs: 6,  priority: 3 },
+  { name: "Sole",                songs: 6,  priority: 3 },
+
+  // Griselda depth
+  { name: "Armani Caesar",       songs: 6,  priority: 2 },
+  { name: "Rome Streetz",        songs: 6,  priority: 2 },
+  { name: "Stove God Cooks",     songs: 6,  priority: 2 },
 ];
 
 // ── Genius API ────────────────────────────────────────────────────────────────
