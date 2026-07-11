@@ -423,7 +423,7 @@ async function analyzeAndStoreInline({ artist, title, lyrics, source, sourceId, 
       const res = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artistName: artist, songName: title, verse: text, verseLabel: label }),
+        body: JSON.stringify({ artistName: artist, songName: title, verse: text, verseLabel: label, sectionLabel: label }),
       });
       if (res.ok) {
         const json = await res.json();

@@ -15,7 +15,7 @@ function authFetch(url: string, opts: RequestInit = {}) {
   }).then(r => r.json());
 }
 
-type Tab = "queue" | "figures" | "users" | "stats";
+type Tab = "queue" | "figures" | "attribution" | "users" | "stats";
 
 export default function Admin() {
   const { user, isMod, isAdmin } = useAuth();
@@ -44,17 +44,18 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 2, marginBottom: 20 }}>
-        {(["queue", "figures", "users", "stats"] as Tab[]).map(t => (
+        {(["queue", "figures", "attribution", "users", "stats"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             fontFamily: MONO, fontSize: 12, padding: "6px 16px",
             background: tab === t ? BLUE : "#eee", color: tab === t ? "#fff" : "#333",
             border: "1px solid #ccc", cursor: "pointer", textTransform: "uppercase",
-          }}>{t === "figures" ? "CID Figures" : t}</button>
+          }}>{t === "figures" ? "CID Figures" : t === "attribution" ? "Attribution" : t}</button>
         ))}
       </div>
 
       {tab === "queue" && <AnnotationQueue statusFilter={statusFilter} setStatusFilter={setStatusFilter} />}
       {tab === "figures" && <FiguresQueue />}
+      {tab === "attribution" && <AttributionReports />}
       {tab === "users" && isAdmin && <UserManager />}
       {tab === "users" && !isAdmin && <div style={{ fontFamily: MONO, color: "#888" }}>Admin only.</div>}
       {tab === "stats" && <StatsPanel />}
@@ -373,3 +374,115 @@ function ChallengeReasons({ annotationId }: { annotationId: number }) {
     </div>
   );
 }
+
+// ── Attribution Reports tab ──────────────────────────────────────────────────
+function AttributionReports() {
+  const [statusFilter, setStatusFilter] = useState("open");
+  const [correctedArtist, setCorrectedArtist] = useState<Record<number,string>>({});
+  const [note, setNote] = useState<Record<number,string>>({});
+  const qc = useQueryClient();
+
+  const { data: reports = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/attribution-reports", statusFilter],
+    queryFn: () => authFetch(`/api/admin/attribution-reports?status=${statusFilter}`),
+    refetchInterval: 20000,
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, status, corrected, resNote }: { id: number; status: string; corrected?: string; resNote?: string }) =>
+      authFetch(`/api/admin/attribution-reports/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, correctedArtist: corrected, resolutionNote: resNote }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/attribution-reports"] }),
+  });
+
+  return (
+    <div>
+      <div style={{ fontFamily: MONO, fontSize: 11, color: "#555", marginBottom: 12 }}>
+        Users flag verses where the credited artist is wrong (e.g. a Kanye verse labeled Jay-Z).
+        Resolve to correct the artist name in the database; dismiss if invalid.
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {["open", "resolved", "dismissed"].map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)} style={{
+            fontFamily: MONO, fontSize: 11, padding: "4px 12px",
+            background: statusFilter === s ? BLUE : "#eee",
+            color: statusFilter === s ? "#fff" : "#333",
+            border: "1px solid #ccc", cursor: "pointer",
+          }}>{s.toUpperCase()}</button>
+        ))}
+      </div>
+
+      {reports.length === 0 && (
+        <div style={{ fontFamily: MONO, fontSize: 12, color: "#888", padding: 20 }}>
+          No {statusFilter} attribution reports.
+        </div>
+      )}
+
+      {reports.map((r: any) => (
+        <div key={r.id} style={{ border: "1px solid #ddd", padding: "12px 16px", marginBottom: 12, background: "#fff" }}>
+          <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: "bold", color: BLUE, marginBottom: 4 }}>
+            "{r.song_name}"
+            <span style={{ fontWeight: "normal", color: "#888", marginLeft: 8 }}>
+              currently: <b>{r.artist_name}</b>
+              {r.reported_artist && <> → should be: <b style={{ color: "#007700" }}>{r.reported_artist}</b></>}
+            </span>
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: "#999", marginBottom: 6 }}>
+            analysis_id: {r.analysis_id}
+            {r.reporter_username && ` · reported by @${r.reporter_username}`}
+          </div>
+          {r.reason && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "#444", marginBottom: 8,
+              padding: "6px 10px", background: "#f9f9f9", borderLeft: "2px solid #ddd" }}>
+              "{r.reason}"
+            </div>
+          )}
+          {statusFilter === "open" && (
+            <div>
+              <input
+                placeholder="Corrected artist name (leave blank if dismissing)"
+                value={correctedArtist[r.id] ?? r.reported_artist ?? ""}
+                onChange={e => setCorrectedArtist(prev => ({ ...prev, [r.id]: e.target.value }))}
+                style={{ fontFamily: MONO, fontSize: 10, border: "1px solid #ccc", padding: "4px 8px",
+                  width: "100%", marginBottom: 6, boxSizing: "border-box" }}
+              />
+              <input
+                placeholder="Resolution note (optional)"
+                value={note[r.id] ?? ""}
+                onChange={e => setNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                style={{ fontFamily: MONO, fontSize: 10, border: "1px solid #ccc", padding: "4px 8px",
+                  width: "100%", marginBottom: 8, boxSizing: "border-box" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => reviewMutation.mutate({
+                    id: r.id, status: "resolved",
+                    corrected: correctedArtist[r.id] || r.reported_artist,
+                    resNote: note[r.id],
+                  })}
+                  style={{ fontFamily: MONO, fontSize: 11, padding: "4px 14px",
+                    background: "#1a7a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                  ✓ RESOLVE{correctedArtist[r.id] || r.reported_artist ? " + FIX ARTIST" : ""}
+                </button>
+                <button
+                  onClick={() => reviewMutation.mutate({ id: r.id, status: "dismissed", resNote: note[r.id] })}
+                  style={{ fontFamily: MONO, fontSize: 11, padding: "4px 14px",
+                    background: "#888", color: "#fff", border: "none", cursor: "pointer" }}>
+                  ✗ DISMISS
+                </button>
+              </div>
+            </div>
+          )}
+          {statusFilter !== "open" && (
+            <div style={{ fontFamily: MONO, fontSize: 10, color: statusFilter === "resolved" ? "#007700" : "#888", marginTop: 6 }}>
+              {statusFilter.toUpperCase()}{r.resolution_note ? ` — ${r.resolution_note}` : ""}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+

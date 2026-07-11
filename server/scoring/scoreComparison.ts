@@ -47,6 +47,33 @@ import type {
 
 // ─── Weights ──────────────────────────────────────────────────────────────────
 const DEFAULT_WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
+
+// Section Weight Multipliers
+// Hooks, bridges, intros, outros carry less lyrical density than verses.
+// Multiplier applied to raw overall score — preserves per-dimension evidence.
+export const SECTION_WEIGHT_MULTIPLIERS: Record<string, number> = {
+  verse_1: 1.0, verse_2: 1.0, verse_3: 1.0, verse_4: 1.0,
+  hook: 0.50, chorus: 0.50, pre_hook: 0.60,
+  bridge: 0.40, interlude: 0.40,
+  intro: 0.30, outro: 0.30,
+  spoken: 0.25,
+  unknown: 0.70,  // mined without header — probably a verse but uncertain
+};
+
+export function sectionMultiplier(label: string | null | undefined): number {
+  if (!label) return 1.0;
+  const key = label.toLowerCase().replace(/[\s-]/g, "_");
+  return SECTION_WEIGHT_MULTIPLIERS[key] ?? 1.0;
+}
+
+export function sectionDisplayLabel(label: string | null | undefined): string {
+  if (!label) return "VERSE";
+  if (label.startsWith("verse_") || label === "verse") return "VERSE";
+  if (["hook","chorus"].includes(label.toLowerCase())) return "HOOK / CHORUS";
+  if (label === "pre_hook") return "PRE-HOOK";
+  return label.toUpperCase().replace(/_/g, " ");
+}
+
 // NOTE: WEIGHTS is now passed as a parameter to every function — no mutable module state
 
 // ─── Measure a Single Verse ───────────────────────────────────────────────────
@@ -873,6 +900,7 @@ export function analyzeVerseSolo(req: {
   artistName: string;
   songName: string;
   verseLabel?: string;
+  sectionLabel?: string;  // verse_1 | hook | intro | outro | bridge | unknown
   verse: string;
   weights?: { flow: number; wordplay: number; storytelling: number; rhyming: number; punchlines: number };
 }): SoloAnalysisResult {
@@ -941,7 +969,12 @@ export function analyzeVerseSolo(req: {
     },
   ];
 
-  const overall = result.scores.overall;
+  const secMultiplier = sectionMultiplier(req.sectionLabel);
+  const rawOverall = result.scores.overall;
+  const overall = parseFloat((rawOverall * secMultiplier).toFixed(2));
+  const sectionNote = secMultiplier < 1.0
+    ? ` Note: scored as ${sectionDisplayLabel(req.sectionLabel)} (${Math.round(secMultiplier * 100)}% weight — non-verse sections carry less lyrical density).`
+    : "";
   const grade =
     overall >= 90 ? "all-time elite" :
     overall >= 80 ? "exceptional" :
@@ -952,7 +985,7 @@ export function analyzeVerseSolo(req: {
   const explanation = `RhymeMath scores ${req.artistName}'s verse on "${req.songName}" at ${overall.toFixed(1)}/100 — ${grade}. ` +
     `Flow: ${result.scores.flow.toFixed(1)} | Wordplay: ${result.scores.wordplay.toFixed(1)} | ` +
     `Storytelling: ${result.scores.storytelling.toFixed(1)} | Rhyming: ${result.scores.rhyming.toFixed(1)} | ` +
-    `Punchlines: ${result.scores.punchlines.toFixed(1)}.`;
+    `Punchlines: ${result.scores.punchlines.toFixed(1)}.${sectionNote}`;
 
   return {
     resultId,

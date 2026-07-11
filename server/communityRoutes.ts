@@ -541,6 +541,86 @@ export function registerCommunityRoutes(app: Express) {
     } finally { await p.end(); }
   });
 
+  // ── Attribution Reports ────────────────────────────────────────────────────
+
+  // POST /api/verses/:analysisId/report-attribution — logged-in users flag wrong artist
+  app.post("/api/verses/:analysisId/report-attribution", requireAuth, async (req, res) => {
+    const { analysisId } = req.params;
+    const { reportedArtist, reason } = req.body || {};
+    const p = pool();
+    try {
+      const analysis = await p.query(
+        `SELECT result_id, artist_name, song_name FROM analyses WHERE result_id=$1 LIMIT 1`,
+        [analysisId]
+      );
+      if (!analysis.rows[0]) return res.status(404).json({ error: "Analysis not found" });
+      const { artist_name, song_name } = analysis.rows[0];
+
+      // Dedup — one open report per user per analysis
+      const existing = await p.query(
+        `SELECT id FROM attribution_reports WHERE analysis_id=$1 AND reported_by=$2 AND status='open' LIMIT 1`,
+        [analysisId, (req as any).user.userId]
+      );
+      if (existing.rows[0]) return res.status(409).json({ error: "You already reported this verse" });
+
+      await p.query(
+        `INSERT INTO attribution_reports
+           (analysis_id, artist_name, song_name, reported_artist, reason, reported_by)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [analysisId, artist_name, song_name,
+         reportedArtist?.trim() || null,
+         reason?.trim() || null,
+         (req as any).user.userId]
+      );
+      res.json({ success: true, message: "Attribution report filed. Our mod team will review it." });
+    } finally { await p.end(); }
+  });
+
+  // GET /api/admin/attribution-reports — list open reports for mods
+  app.get("/api/admin/attribution-reports", requireMod, async (req, res) => {
+    const { status = "open" } = req.query;
+    const p = pool();
+    try {
+      const result = await p.query(
+        `SELECT r.*, u.username AS reporter_username
+         FROM attribution_reports r
+         LEFT JOIN community_users u ON u.id = r.reported_by
+         WHERE r.status=$1
+         ORDER BY r.created_at ASC`,
+        [status]
+      );
+      res.json(result.rows);
+    } finally { await p.end(); }
+  });
+
+  // PATCH /api/admin/attribution-reports/:id — resolve or dismiss a report
+  app.patch("/api/admin/attribution-reports/:id", requireMod, async (req, res) => {
+    const { status, resolutionNote, correctedArtist } = req.body || {};
+    if (!["resolved", "dismissed"].includes(status))
+      return res.status(400).json({ error: "status must be resolved or dismissed" });
+    const p = pool();
+    try {
+      const report = await p.query(`SELECT * FROM attribution_reports WHERE id=$1`, [req.params.id]);
+      if (!report.rows[0]) return res.status(404).json({ error: "Report not found" });
+
+      await p.query(
+        `UPDATE attribution_reports
+         SET status=$1, resolution_note=$2, resolved_by=$3, updated_at=EXTRACT(EPOCH FROM NOW())::BIGINT
+         WHERE id=$4`,
+        [status, resolutionNote?.trim() || null, (req as any).user.userId, req.params.id]
+      );
+
+      // If resolving — optionally fix the artist name on the analysis
+      if (status === "resolved" && correctedArtist?.trim()) {
+        await p.query(
+          `UPDATE analyses SET artist_name=$1 WHERE result_id=$2`,
+          [correctedArtist.trim(), report.rows[0].analysis_id]
+        );
+      }
+      res.json({ success: true });
+    } finally { await p.end(); }
+  });
+
   // PATCH /api/admin/figures/:id — approve or reject a submitted figure
   app.patch("/api/admin/figures/:id", requireMod, async (req, res) => {
     const { status } = req.body || {};

@@ -6,6 +6,7 @@ import type { RhymeMathResult, CategoryScore } from "../lib/types.js";
 import { getCachedResult } from "../lib/resultCache.js";
 import { apiRequest } from "../lib/queryClient.js";
 import AnalysisComments from "../components/AnalysisComments.js";
+import { AttributionReportButton } from "@/components/AttributionReportButton";
 import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
 
 function copyShareLink() {
@@ -44,6 +45,9 @@ function SoloResultView({ result }: { result: any }) {
           </div>
           <div style={{ fontFamily: "Courier New, monospace", fontSize: "13px", color: "#333", marginBottom: "8px" }}>
             {songName}{verseLabel ? ` — ${verseLabel}` : ""}
+          </div>
+          <div style={{ position: "relative" }}>
+            <AttributionReportButton analysisId={result.resultId ?? ""} artistName={artistName} songName={songName} />
           </div>
           <div style={{ fontFamily: "Courier New, monospace", fontSize: "36px", fontWeight: 700, color: "#1a3a7a", lineHeight: 1 }}>
             {scores.overall.toFixed(1)}

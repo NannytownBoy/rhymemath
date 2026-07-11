@@ -215,7 +215,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const artistName = sanitizeText(req.body?.artistName, 100);
       const songName   = sanitizeText(req.body?.songName, 150);
       const verse      = sanitizeText(req.body?.verse, 8000);
-      const verseLabel = sanitizeText(req.body?.verseLabel, 50);
+      const verseLabel   = sanitizeText(req.body?.verseLabel, 50);
+      const sectionLabel  = sanitizeText(req.body?.sectionLabel, 30) || null;
       const scoringMode = req.body?.scoringMode === "custom" ? "custom" : "standard";
       const rawWeights  = validateWeights(req.body?.weights);
       const isCustom    = scoringMode === "custom" && rawWeights !== null;
@@ -229,6 +230,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const result = analyzeVerseSolo({
         artistName, songName,
         verseLabel: verseLabel || undefined,
+        sectionLabel: sectionLabel || undefined,
         verse: effectiveVerse,
         weights: isCustom ? rawWeights! : undefined,
       });

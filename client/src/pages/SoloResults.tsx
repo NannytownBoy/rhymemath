@@ -4,6 +4,7 @@ import { apiRequest } from "../lib/queryClient.js";
 import { SingleScoreBar } from "../components/ScoreBar.js";
 import VerseAnnotation from "../components/VerseAnnotation.js";
 import { getCachedResult } from "../lib/resultCache.js";
+import { AttributionReportButton } from "@/components/AttributionReportButton";
 import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
 
 export default function SoloResults() {
@@ -117,6 +118,22 @@ export default function SoloResults() {
                     [{result.verseLabel}]
                   </span>
                 )}
+                {result.sectionLabel && !result.sectionLabel.startsWith("verse") && result.sectionLabel !== "unknown" && (
+                  <span style={{
+                    display: "inline-block", fontFamily: "Courier New, monospace", fontSize: "9px",
+                    background: "#fef3cd", color: "#856404", border: "1px solid #ffc107",
+                    padding: "1px 7px", marginLeft: 8, verticalAlign: "middle",
+                  }}>
+                    ⚠ {result.sectionLabel.replace(/_/g, " ").toUpperCase()} — scored at reduced weight
+                  </span>
+                )}
+                <span style={{ position: "relative" }}>
+                  <AttributionReportButton
+                    analysisId={result.resultId ?? ""}
+                    artistName={result.artistName ?? ""}
+                    songName={result.songName ?? ""}
+                  />
+                </span>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
