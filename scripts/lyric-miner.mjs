@@ -576,31 +576,39 @@ async function getSongByUrl(url) {
 }
 
 // Fetch actual lyrics text via the Genius page (API doesn't return full lyrics)
-async function fetchLyricsFromPage(url) {
+// Fetch lyrics via lyrics.ovh (free, no key, returns section headers).
+// Falls back to empty string — never throws.
+async function fetchLyricsFromPage(geniusUrl, artistName, songTitle) {
+  // 1. Try lyrics.ovh
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
-    const html = await res.text();
-    // Extract text between data-lyrics-container divs
-    const matches = [...html.matchAll(/data-lyrics-container[^>]*>([\s\S]*?)<\/div>/g)];
-    if (!matches.length) return "";
-    let lyrics = matches.map(m => m[1]).join("\n");
-    // Strip HTML tags
-    lyrics = lyrics.replace(/<br\s*\/?>/gi, "\n");
-    lyrics = lyrics.replace(/<[^>]+>/g, "");
-    // Decode HTML entities
-    lyrics = lyrics.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-      .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-      .replace(/&apos;/g, "'");
-    return lyrics.trim();
-  } catch (e) {
-    return "";
-  }
+    if (artistName && songTitle) {
+      const ovhUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(artistName)}/${encodeURIComponent(songTitle)}`;
+      const res = await fetch(ovhUrl, { headers: { Accept: "application/json" } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lyrics && data.lyrics.trim().length > 50) return data.lyrics.trim();
+      }
+    }
+  } catch (_) {}
+
+  // 2. Fallback: try to derive artist/title from Genius URL and retry lyrics.ovh
+  try {
+    if (geniusUrl) {
+      const slug = geniusUrl.split("genius.com/")[1]?.replace(/-lyrics$/, "") || "";
+      // Genius slugs: "Nas-ny-state-of-mind" → guess split at first uppercase-after-lowercase
+      const parts = slug.replace(/-/g, " ").trim();
+      if (parts) {
+        const ovhUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(parts.split(" ")[0])}/${encodeURIComponent(parts.split(" ").slice(1).join(" "))}`;
+        const res = await fetch(ovhUrl, { headers: { Accept: "application/json" } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.lyrics && data.lyrics.trim().length > 50) return data.lyrics.trim();
+        }
+      }
+    }
+  } catch (_) {}
+
+  return "";
 }
 
 // ── Text analysis ─────────────────────────────────────────────────────────────
@@ -1067,18 +1075,20 @@ async function main() {
       process.stdout.write(`  Mining: ${title.substring(0, 60)}... `);
       try {
         const lyricsUrl = song.url;
-        const text = await fetchLyricsFromPage(lyricsUrl);
+        const songTitleClean = song.title || title;
+        const text = await fetchLyricsFromPage(lyricsUrl, artist, songTitleClean);
         if (!text || text.length < 50) {
           console.log(`(no lyrics found, skipping)`);
           continue;
         }
         allTexts.push(text);
-        const { records, aliases, entendres, punchlines } = await mineText(text, title, artist);
+        const { records, aliases, entendres, punchlines, figures } = await mineText(text, title, artist);
         allRecords.push(...records);
         allAliases.push(...aliases);
         allEntendres.push(...entendres);
         allPunchlines.push(...punchlines);
-        process.stdout.write(`+${records.length} rec +${entendres.length} ent +${punchlines.length} pch`);
+        allFigures.push(...(figures || []));
+        process.stdout.write(`+${records.length} rec +${entendres.length} ent +${punchlines.length} pch +${(figures||[]).length} fig`);
 
         // ── Analyze-and-store (opt-in via --analyze flag) ──────────────────
         if (ANALYZE && DATABASE_URL) {
