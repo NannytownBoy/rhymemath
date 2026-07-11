@@ -12,6 +12,7 @@ import {
 } from "./auth";
 import { POINTS } from "@shared/schema";
 import { clearCIDCache } from "./scoring/cidLookup";
+import { extractCIDFromAnnotation } from "./cidExtract";
 
 const DB = process.env.DATABASE_URL!;
 
@@ -184,11 +185,19 @@ export function registerCommunityRoutes(app: Express) {
   // POST /api/annotations — submit a new annotation
   app.post("/api/annotations", requireAuth, async (req, res) => {
     const user = (req as any).user as JWTPayload;
-    const { analysisId, comparisonId, side, anchorText, startIndex, endIndex,
-            meaning, meaningType, interpretation1, interpretation2, interpretation3, domainTags } = req.body || {};
+    const {
+      analysisId, comparisonId, side,
+      anchorText, charStart, charEnd,
+      meaning,                              // free-text explanation (required)
+      annotationType,                       // meaning | cultural_ref | double_meaning | historical | brand_place | other
+      imageUrl,                             // optional image URL
+      // legacy fields — kept for backward compat
+      meaningType, interpretation1, interpretation2, interpretation3, domainTags,
+      startIndex, endIndex,
+    } = req.body || {};
 
-    if (!anchorText || !meaning || !meaningType)
-      return res.status(400).json({ error: "anchorText, meaning, meaningType required" });
+    if (!anchorText || !meaning)
+      return res.status(400).json({ error: "anchorText and meaning required" });
     if (!analysisId && !comparisonId)
       return res.status(400).json({ error: "analysisId or comparisonId required" });
 
@@ -197,22 +206,138 @@ export function registerCommunityRoutes(app: Express) {
       const result = await p.query(`
         INSERT INTO annotations
           (analysis_id, comparison_id, side, anchor_text, start_index, end_index,
-           meaning, meaning_type, interpretation_1, interpretation_2, interpretation_3,
+           char_start, char_end,
+           meaning, meaning_type, annotation_type,
+           image_url,
+           interpretation_1, interpretation_2, interpretation_3,
            domain_tags, status, submitted_by, submitted_by_username, created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,$15)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,$18,$19)
         RETURNING *
       `, [
         analysisId ?? null, comparisonId ?? null, side ?? null,
         anchorText, startIndex ?? null, endIndex ?? null,
-        meaning, meaningType, interpretation1 ?? null, interpretation2 ?? null, interpretation3 ?? null,
+        charStart ?? null, charEnd ?? null,
+        meaning, meaningType ?? annotationType ?? "meaning",
+        annotationType ?? "meaning",
+        imageUrl?.trim() || null,
+        interpretation1 ?? null, interpretation2 ?? null, interpretation3 ?? null,
         domainTags ?? null, user.userId, user.username, now()
       ]);
 
       const ann = result.rows[0];
-      // Award submission points
       await awardPoints(p, user.userId, POINTS.ANNOTATION_SUBMITTED, "annotation_submitted", ann.id);
 
+      // Fire-and-forget AI extraction — extracts CID candidates from the explanation
+      extractCIDFromAnnotation(ann).catch(() => {});
+
       res.json({ annotation: ann, pointsEarned: POINTS.ANNOTATION_SUBMITTED });
+    } finally { await p.end(); }
+  });
+
+  // POST /api/annotations/:id/upvote — toggle upvote, award +2 pts to author
+  app.post("/api/annotations/:id/upvote", requireAuth, async (req, res) => {
+    const annId = parseInt(req.params.id);
+    const userId = (req as any).user.userId;
+    const p = pool();
+    try {
+      // Check if already upvoted
+      const existing = await p.query(
+        `SELECT 1 FROM annotation_upvotes WHERE annotation_id=$1 AND user_id=$2`,
+        [annId, userId]
+      );
+      if (existing.rows.length > 0) {
+        // Un-upvote
+        await p.query(`DELETE FROM annotation_upvotes WHERE annotation_id=$1 AND user_id=$2`, [annId, userId]);
+        await p.query(`UPDATE annotations SET upvotes = GREATEST(0, upvotes - 1) WHERE id=$1`, [annId]);
+        return res.json({ upvoted: false });
+      }
+      // Upvote
+      await p.query(
+        `INSERT INTO annotation_upvotes (annotation_id, user_id) VALUES ($1,$2)`,
+        [annId, userId]
+      );
+      const updated = await p.query(
+        `UPDATE annotations SET upvotes = upvotes + 1 WHERE id=$1 RETURNING upvotes, submitted_by`,
+        [annId]
+      );
+      const { upvotes, submitted_by } = updated.rows[0];
+      // Award +2 pts to annotation author (not to self-upvoters)
+      if (submitted_by && submitted_by !== userId) {
+        await awardPoints(p, submitted_by, 2, "annotation_upvoted", annId);
+      }
+      // Milestone bonus at 10 upvotes
+      if (upvotes === 10 && submitted_by) {
+        await awardPoints(p, submitted_by, 15, "annotation_milestone_10", annId);
+      }
+      res.json({ upvoted: true, upvotes });
+    } finally { await p.end(); }
+  });
+
+  // POST /api/annotations/:id/improve — suggest improvement to an annotation
+  app.post("/api/annotations/:id/improve", requireAuth, async (req, res) => {
+    const annId = parseInt(req.params.id);
+    const userId = (req as any).user.userId;
+    const { reason, suggestion } = req.body || {};
+    if (!reason || !suggestion?.trim())
+      return res.status(400).json({ error: "reason and suggestion required" });
+    const p = pool();
+    try {
+      const ann = await p.query(`SELECT * FROM annotations WHERE id=$1`, [annId]);
+      if (!ann.rows[0]) return res.status(404).json({ error: "Annotation not found" });
+      const result = await p.query(
+        `INSERT INTO annotation_improvements (annotation_id, suggested_by, reason, suggestion)
+         VALUES ($1,$2,$3,$4) RETURNING *`,
+        [annId, userId, reason, suggestion.trim()]
+      );
+      res.json({ improvement: result.rows[0] });
+    } finally { await p.end(); }
+  });
+
+  // GET /api/annotations/:id/improvements — load suggestions for an annotation
+  app.get("/api/annotations/:id/improvements", async (req, res) => {
+    const p = pool();
+    try {
+      const result = await p.query(
+        `SELECT i.*, u.username AS suggester_username
+         FROM annotation_improvements i
+         LEFT JOIN community_users u ON u.id = i.suggested_by
+         WHERE i.annotation_id=$1 AND i.status='pending'
+         ORDER BY i.created_at DESC`,
+        [parseInt(req.params.id)]
+      );
+      res.json(result.rows);
+    } finally { await p.end(); }
+  });
+
+  // PATCH /api/annotations/:id/improve/:impId — accept/reject an improvement (annotation author only)
+  app.patch("/api/annotations/:id/improve/:impId", requireAuth, async (req, res) => {
+    const userId = (req as any).user.userId;
+    const { status } = req.body || {}; // accepted | rejected
+    if (!["accepted","rejected"].includes(status))
+      return res.status(400).json({ error: "status must be accepted or rejected" });
+    const p = pool();
+    try {
+      const ann = await p.query(`SELECT submitted_by FROM annotations WHERE id=$1`, [parseInt(req.params.id)]);
+      if (!ann.rows[0] || ann.rows[0].submitted_by !== userId)
+        return res.status(403).json({ error: "Only the annotation author can review improvements" });
+
+      const imp = await p.query(
+        `UPDATE annotation_improvements SET status=$1, reviewed_at=$2 WHERE id=$3 AND annotation_id=$4 RETURNING *`,
+        [status, Date.now(), parseInt(req.params.impId), parseInt(req.params.id)]
+      );
+      if (!imp.rows[0]) return res.status(404).json({ error: "Improvement not found" });
+
+      if (status === "accepted") {
+        // Award +5 to suggester, apply the improvement text as new meaning
+        await p.query(`UPDATE annotations SET meaning=$1 WHERE id=$2`,
+          [imp.rows[0].suggestion, parseInt(req.params.id)]);
+        if (imp.rows[0].suggested_by) {
+          await awardPoints(p, imp.rows[0].suggested_by, 5, "improvement_accepted", imp.rows[0].id);
+        }
+        // Also award author +5 for accepting
+        await awardPoints(p, userId, 5, "improvement_accepted_by_author", imp.rows[0].id);
+      }
+      res.json({ success: true, status });
     } finally { await p.end(); }
   });
 

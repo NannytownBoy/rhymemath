@@ -131,9 +131,32 @@ function AnnotationQueue({ statusFilter, setStatusFilter }: { statusFilter: stri
           </div>
 
           <div style={{ marginBottom: 6 }}><strong>Meaning:</strong> {ann.meaning}</div>
+          {ann.image_url && (
+            <div style={{ marginBottom: 8 }}>
+              <img src={ann.image_url} alt="annotation image" style={{ maxWidth: 180, maxHeight: 120, border: '1px solid #ddd', display: 'block' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+          )}
           {ann.interpretation_1 && <div><strong>Surface:</strong> {ann.interpretation_1}</div>}
           {ann.interpretation_2 && <div><strong>Hidden:</strong> {ann.interpretation_2}</div>}
           {ann.interpretation_3 && <div><strong>3rd layer:</strong> {ann.interpretation_3}</div>}
+          {ann.extracted_cid && (() => {
+            try {
+              const cands = typeof ann.extracted_cid === 'string' ? JSON.parse(ann.extracted_cid) : ann.extracted_cid;
+              if (!Array.isArray(cands) || cands.length === 0) return null;
+              return (
+                <div style={{ marginTop: 8, background: '#f0f8f0', border: '1px solid #9c9', padding: '8px 10px' }}>
+                  <div style={{ fontSize: 10, letterSpacing: '0.07em', color: '#555', marginBottom: 6 }}>CID CANDIDATES EXTRACTED</div>
+                  {cands.map((c: any, i: number) => (
+                    <div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
+                      <strong>[{c.layer}]</strong> <em>{c.term}</em>{c.canonical ? ` → ${c.canonical}` : ''}: {c.meaning}
+                      {c.confidence && <span style={{ color: '#888', marginLeft: 6 }}>({Math.round(c.confidence * 100)}% conf)</span>}
+                    </div>
+                  ))}
+                </div>
+              );
+            } catch { return null; }
+          })()}
 
           {(ann.status === "pending" || ann.status === "challenged") && (
             <div style={{ marginTop: 12 }}>
