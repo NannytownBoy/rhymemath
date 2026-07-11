@@ -118,15 +118,7 @@ export default function SoloResults() {
                     [{result.verseLabel}]
                   </span>
                 )}
-                {result.sectionLabel && !result.sectionLabel.startsWith("verse") && result.sectionLabel !== "unknown" && (
-                  <span style={{
-                    display: "inline-block", fontFamily: "Courier New, monospace", fontSize: "9px",
-                    background: "#fef3cd", color: "#856404", border: "1px solid #ffc107",
-                    padding: "1px 7px", marginLeft: 8, verticalAlign: "middle",
-                  }}>
-                    ⚠ {result.sectionLabel.replace(/_/g, " ").toUpperCase()} — scored at reduced weight
-                  </span>
-                )}
+
                 <span style={{ position: "relative" }}>
                   <AttributionReportButton
                     analysisId={result.resultId ?? ""}
@@ -137,12 +129,25 @@ export default function SoloResults() {
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "Arial Black, Arial, sans-serif", fontSize: "40px", color: gradeColor, lineHeight: 1 }}>
-                {fmt(scores.overall)}
-              </div>
-              <div style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: gradeColor, fontWeight: "bold" }}>
-                {grade}
-              </div>
+              {result.excluded ? (
+                <div style={{ fontFamily: "Courier New, monospace", fontSize: "12px", color: "#999",
+                  border: "1px dashed #ccc", padding: "10px 14px", lineHeight: 1.5, textAlign: "center" }}>
+                  <div style={{ fontSize: 9, color: "#bbb", letterSpacing: "0.1em", textTransform: "uppercase" }}>Unscored</div>
+                  <div style={{ fontSize: 11, fontWeight: "bold", color: "#aaa", margin: "4px 0" }}>
+                    {(result.sectionLabel || "non-verse").replace(/_/g, " ").toUpperCase()}
+                  </div>
+                  <div style={{ fontSize: 9, color: "#ccc" }}>Not a verse · excluded<br/>from scoring system</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: "Arial Black, Arial, sans-serif", fontSize: "40px", color: gradeColor, lineHeight: 1 }}>
+                    {fmt(scores.overall)}
+                  </div>
+                  <div style={{ fontFamily: "Courier New, monospace", fontSize: "11px", color: gradeColor, fontWeight: "bold" }}>
+                    {grade}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

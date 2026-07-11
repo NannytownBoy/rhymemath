@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { scoreComparison, analyzeVerseSolo } from "./scoring/scoreComparison";
+import { scoreComparison, analyzeVerseSolo, isNonVerse, sectionDisplayLabel } from "./scoring/scoreComparison";
 import { scoreCIDSignals, clearCIDCache, getMatchedTokens } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
@@ -303,7 +303,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           scoringMode: isCustom ? `custom-${SCORING_VERSION}` : `standard-${SCORING_VERSION}`,
           customWeights: isCustom ? JSON.stringify(rawWeights) : null,
           resultJson: JSON.stringify(result),
-          scoreOverall: result.scores.overall,
+          scoreOverall: result.excluded ? null : result.scores.overall,
           scoreFlow: result.scores.flow,
           scoreWordplay: result.scores.wordplay,
           scoreStorytelling: result.scores.storytelling,

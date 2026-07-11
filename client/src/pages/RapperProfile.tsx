@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { useState } from "react";
 import { SingleScoreBar } from "../components/ScoreBar.js";
 import { apiRequest } from "@/lib/queryClient";
+import { AttributionReportButton } from "@/components/AttributionReportButton";
 import { AnnotationOverlay } from "../components/AnnotationOverlay.js";
 
 // ── Expandable analyzed tracks with inline AnnotationOverlay ────────────────
@@ -82,8 +83,22 @@ function TrackAnnotationPanel({ resultId, artistName }: { resultId: string; arti
 
   return (
     <div style={{ padding: "12px 14px", borderTop: "1px solid #ddd" }}>
-      <div style={{ fontFamily: "Courier New, monospace", fontSize: 10, color: "#888", marginBottom: 8 }}>
-        {data.songName}{data.verseLabel ? ` — ${data.verseLabel}` : ""} · Score: {data.scores?.overall?.toFixed(1)}
+      <div style={{ fontFamily: "Courier New, monospace", fontSize: 10, color: "#888", marginBottom: 8, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span>{data.songName}{data.verseLabel ? ` — ${data.verseLabel}` : ""}</span>
+        {data.excluded ? (
+          <span style={{ background: "#f0f0f0", color: "#888", padding: "1px 7px", fontSize: 9, border: "1px solid #ddd" }}>
+            UNSCORED — {(data.sectionLabel || "non-verse").replace(/_/g, " ").toUpperCase()}
+          </span>
+        ) : (
+          <span>· Score: {data.scores?.overall != null ? data.scores.overall.toFixed(1) : "—"}</span>
+        )}
+        <span style={{ position: "relative" }}>
+          <AttributionReportButton
+            analysisId={resultId}
+            artistName={artistName}
+            songName={data.songName ?? ""}
+          />
+        </span>
       </div>
       <AnnotationOverlay
         verse={data.verse}

@@ -48,22 +48,24 @@ import type {
 // ─── Weights ──────────────────────────────────────────────────────────────────
 const DEFAULT_WEIGHTS = { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
 
-// Section Weight Multipliers
-// Hooks, bridges, intros, outros carry less lyrical density than verses.
-// Multiplier applied to raw overall score — preserves per-dimension evidence.
-export const SECTION_WEIGHT_MULTIPLIERS: Record<string, number> = {
-  verse_1: 1.0, verse_2: 1.0, verse_3: 1.0, verse_4: 1.0,
-  hook: 0.50, chorus: 0.50, pre_hook: 0.60,
-  bridge: 0.40, interlude: 0.40,
-  intro: 0.30, outro: 0.30,
-  spoken: 0.25,
-  unknown: 0.70,  // mined without header — probably a verse but uncertain
-};
+// Section Exclusion
+// Hooks, bridges, intros, outros, spoken word, and pre-hooks have no narrative
+// verse value and should not receive a score. They are analyzed for annotations
+// and CID tagging but excluded from the scoring system entirely.
+// Only labeled verses (verse_1..4) and unknown sections score.
+export const NON_VERSE_SECTIONS = new Set([
+  "hook", "chorus", "pre_hook", "bridge", "interlude",
+  "intro", "outro", "spoken",
+]);
 
-export function sectionMultiplier(label: string | null | undefined): number {
-  if (!label) return 1.0;
-  const key = label.toLowerCase().replace(/[\s-]/g, "_");
-  return SECTION_WEIGHT_MULTIPLIERS[key] ?? 1.0;
+export function isNonVerse(label: string | null | undefined): boolean {
+  if (!label) return false;
+  return NON_VERSE_SECTIONS.has(label.toLowerCase().replace(/[\s-]/g, "_"));
+}
+
+// Keep for backward compat — always returns 1.0 (exclusion handled at route level)
+export function sectionMultiplier(_label: string | null | undefined): number {
+  return 1.0;
 }
 
 export function sectionDisplayLabel(label: string | null | undefined): string {
@@ -969,11 +971,10 @@ export function analyzeVerseSolo(req: {
     },
   ];
 
-  const secMultiplier = sectionMultiplier(req.sectionLabel);
-  const rawOverall = result.scores.overall;
-  const overall = parseFloat((rawOverall * secMultiplier).toFixed(2));
-  const sectionNote = secMultiplier < 1.0
-    ? ` Note: scored as ${sectionDisplayLabel(req.sectionLabel)} (${Math.round(secMultiplier * 100)}% weight — non-verse sections carry less lyrical density).`
+  const excluded = isNonVerse(req.sectionLabel);
+  const overall = result.scores.overall;
+  const sectionNote = excluded
+    ? ` Note: this section is a ${sectionDisplayLabel(req.sectionLabel)} and is excluded from scoring. Verse analysis and annotations are still available.`
     : "";
   const grade =
     overall >= 90 ? "all-time elite" :
@@ -992,8 +993,10 @@ export function analyzeVerseSolo(req: {
     artistName: req.artistName,
     songName: req.songName,
     verseLabel: req.verseLabel,
+    sectionLabel: req.sectionLabel ?? null,
+    excluded,
     verse: req.verse,
-    scores: result.scores,
+    scores: excluded ? { ...result.scores, overall: null } : result.scores,
     analysis: result.analysis,
     categories,
     explanation,
