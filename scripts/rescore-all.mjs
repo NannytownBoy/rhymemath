@@ -39,8 +39,7 @@ const LIMIT    = limitIdx >= 0 ? parseInt(process.argv[limitIdx + 1]) : Infinity
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL ||
-    "postgresql://postgres:TsKMoFmORcQVhbhlDMJVlsbTrKGmRELC@reseau.proxy.rlwy.net:12215/railway",
+  connectionString: process.env.DATABASE_URL || (() => { throw new Error("DATABASE_URL env var is required — set it before running this script"); })(),
 });
 
 // ── Inline scoring (avoid ESM server-side import issues in script context) ───

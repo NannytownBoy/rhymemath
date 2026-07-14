@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────
 
 export GENIUS_TOKEN="${GENIUS_TOKEN:-2eKGsXG31hJYunM85zb-3IyIZsNhZ1uPBAyoV1qfWz4Zx-rPGmZ9ihaIv6lKsaFL}"
-export DATABASE_URL="${DATABASE_URL:-postgresql://postgres:TsKMoFmORcQVhbhlDMJVlsbTrKGmRELC@reseau.proxy.rlwy.net:12215/railway}"
+export DATABASE_URL="${DATABASE_URL:-REMOVED_SEE_ENV_VAR}"
 export API_BASE="${API_BASE:-https://rhymemath-production.up.railway.app}"
 
 # CONTINUOUS=1 — bypass cooldowns entirely, mine round-the-clock
