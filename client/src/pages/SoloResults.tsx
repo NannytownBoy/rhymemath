@@ -152,68 +152,77 @@ export default function SoloResults() {
           </div>
         </div>
 
-        {/* Score Breakdown */}
-        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ SCORE BREAKDOWN</div>
-        <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
-          {[
-            { label: "Flow (30%)", value: scores.flow },
-            { label: "Wordplay (20%)", value: scores.wordplay },
-            { label: "Storytelling (16%)", value: scores.storytelling },
-            { label: "Rhyme Craft (22%)", value: scores.rhyming },
-            { label: "Punchlines (12%)", value: scores.punchlines },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ marginBottom: "10px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                <span style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", color: "#333" }}>{label}</span>
-                <span style={{ fontFamily: "Courier New, monospace", fontSize: "12px", fontWeight: "bold", color: "#1a3a7a" }}>{fmt(value)}</span>
-              </div>
-              <SingleScoreBar score={value} label="" color="#1a3a7a" animate={false} />
-            </div>
-          ))}
-        </div>
-
-        {/* Category Reasoning */}
-        <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ ANALYSIS</div>
-        <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: "13px", color: "#333", margin: "0 0 12px", lineHeight: "1.6" }}>
-            {result.explanation}
-          </p>
-          {result.categories?.map((cat: any) => (
-            <div key={cat.name} style={{ borderTop: "1px solid #eee", paddingTop: "8px", marginTop: "8px" }}>
-              <span style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", color: "#1a3a7a" }}>
-                {cat.name}:
-              </span>{" "}
-              <span style={{ fontFamily: "Georgia, serif", fontSize: "12px", color: "#555" }}>
-                {cat.reasoning}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Technical Metrics */}
-        {measured && (
+        {/* Score Breakdown — hidden for non-verse sections */}
+        {!result.excluded && (
           <>
-            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ TECHNICAL METRICS</div>
-            <div className="rm-card" style={{ padding: "10px 14px", marginBottom: "12px" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Courier New, monospace", fontSize: "11px" }}>
-                <tbody>
-                  {[
-                    ["Lines", measured.lineCount],
-                    ["End Rhymes", measured.endRhymes],
-                    ["Internal Rhymes", measured.internalRhymes],
-                    ["Rhyme Density", `${fmt(measured.rhymeDensity * 100)}%`],
-                    ["Avg Words/Line", fmt(measured.avgLineLength)],
-                    ["Syllables (approx)", measured.syllableApproximation],
-                    ["Verse Structure", measured.verseStructure],
-                  ].map(([label, val], i) => (
-                    <tr key={String(label)} style={{ background: i % 2 === 0 ? "#fff" : "#f5f3ef" }}>
-                      <td style={{ padding: "4px 8px", color: "#888", width: "50%" }}>{label}</td>
-                      <td style={{ padding: "4px 8px", color: "#333", fontWeight: "bold" }}>{val}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ SCORE BREAKDOWN</div>
+            <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
+              {[
+                { label: "Flow (30%)", value: scores.flow },
+                { label: "Wordplay (20%)", value: scores.wordplay },
+                { label: "Storytelling (16%)", value: scores.storytelling },
+                { label: "Rhyme Craft (22%)", value: scores.rhyming },
+                { label: "Punchlines (12%)", value: scores.punchlines },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                    <span style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", color: "#333" }}>{label}</span>
+                    <span style={{ fontFamily: "Courier New, monospace", fontSize: "12px", fontWeight: "bold", color: "#1a3a7a" }}>{fmt(value)}</span>
+                  </div>
+                  <SingleScoreBar score={value} label="" color="#1a3a7a" animate={false} />
+                </div>
+              ))}
             </div>
+          </>
+        )}
+
+        {/* Analysis + Technical Metrics — hidden for non-verse sections */}
+        {!result.excluded && (
+          <>
+            {/* Category Reasoning */}
+            <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ ANALYSIS</div>
+            <div className="rm-card" style={{ padding: "12px 14px", marginBottom: "12px" }}>
+              <p style={{ fontFamily: "Georgia, serif", fontSize: "13px", color: "#333", margin: "0 0 12px", lineHeight: "1.6" }}>
+                {result.explanation}
+              </p>
+              {result.categories?.map((cat: any) => (
+                <div key={cat.name} style={{ borderTop: "1px solid #eee", paddingTop: "8px", marginTop: "8px" }}>
+                  <span style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", color: "#1a3a7a" }}>
+                    {cat.name}:
+                  </span>{" "}
+                  <span style={{ fontFamily: "Georgia, serif", fontSize: "12px", color: "#555" }}>
+                    {cat.reasoning}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Technical Metrics */}
+            {measured && (
+              <>
+                <div className="rm-section-header-blue" style={{ marginBottom: "0" }}>▶ TECHNICAL METRICS</div>
+                <div className="rm-card" style={{ padding: "10px 14px", marginBottom: "12px" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Courier New, monospace", fontSize: "11px" }}>
+                    <tbody>
+                      {[
+                        ["Lines", measured.lineCount],
+                        ["End Rhymes", measured.endRhymes],
+                        ["Internal Rhymes", measured.internalRhymes],
+                        ["Rhyme Density", `${fmt(measured.rhymeDensity * 100)}%`],
+                        ["Avg Words/Line", fmt(measured.avgLineLength)],
+                        ["Syllables (approx)", measured.syllableApproximation],
+                        ["Verse Structure", measured.verseStructure],
+                      ].map(([label, val], i) => (
+                        <tr key={String(label)} style={{ background: i % 2 === 0 ? "#fff" : "#f5f3ef" }}>
+                          <td style={{ padding: "4px 8px", color: "#888", width: "50%" }}>{label}</td>
+                          <td style={{ padding: "4px 8px", color: "#333", fontWeight: "bold" }}>{val}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </>
         )}
 

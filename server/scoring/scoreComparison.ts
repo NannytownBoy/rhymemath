@@ -1146,7 +1146,9 @@ export async function analyzeVerseSolo(req: {
     sectionLabel: req.sectionLabel ?? null,
     excluded,
     verse: req.verse,
-    scores: excluded ? { ...result.scores, overall: null } : result.scores,
+    scores: excluded
+      ? { flow: null, rhyming: null, wordplay: null, storytelling: null, punchlines: null, overall: null }
+      : result.scores,
     analysis: result.analysis,
     categories,
     explanation,
