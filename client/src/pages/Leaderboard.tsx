@@ -241,7 +241,7 @@ function ArtistPopup({
 export default function Leaderboard() {
   const PAGE_SIZE = 25;
   const [category, setCategory] = useState<Category>("overall");
-  const [sortBy, setSortBy] = useState<SortBy>("score");
+  const [sortBy, setSortBy] = useState<SortBy>("bestScore");
   const [popupArtist, setPopupArtist] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
@@ -400,6 +400,9 @@ export default function Leaderboard() {
                         title="Click to see all analyzed verses"
                       >
                         {entry.artistName}
+                        {entry.lowSampleWarning && (
+                          <span style={{ color: "#b8860b", fontSize: "10px", marginLeft: "2px" }} title="Low sample size — fewer than 3 verses analyzed">*</span>
+                        )}
                       </button>
                       <span style={{ fontFamily: "Courier New, monospace", fontSize: "9px", color: "#aaa", marginLeft: "6px" }}>
                         [{entry.comparisons} verse{entry.comparisons !== 1 ? "s" : ""}]
@@ -507,7 +510,7 @@ export default function Leaderboard() {
         )}
 
         <p style={{ fontFamily: "Courier New, monospace", fontSize: "10px", color: "#999", marginTop: "8px" }}>
-          * W-L = battle record only (-- means no head-to-head battles yet). Verses Input = total solo + battle analyses submitted. Click any artist to see full score breakdown.
+          * W-L = battle record only. Verses Input = total solo + battle analyses. * = fewer than 3 verses analyzed (low sample, treat with caution). Click any artist to see full breakdown.
         </p>
       </div>
     </main>
