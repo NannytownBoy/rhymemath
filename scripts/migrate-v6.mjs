@@ -59,6 +59,15 @@ async function run() {
   `);
   console.log("  ✓ cid_cultural_records: provenance, source_version, mined_only, ai_only, promotion_blocked, canon_category");
 
+  // ── 3b. Add mined_only to CID child tables ────────────────────────────────
+  await pool.query(`
+    ALTER TABLE cid_aliases ADD COLUMN IF NOT EXISTS mined_only BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE cid_entendre_candidates ADD COLUMN IF NOT EXISTS mined_only BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE cid_punchline_patterns ADD COLUMN IF NOT EXISTS mined_only BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE cid_figures ADD COLUMN IF NOT EXISTS mined_only BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+  console.log("  ✓ cid child tables: mined_only columns");
+
   // ── 4. cid_canon_examples — calibration anchors only, never scored directly ──
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cid_canon_examples (

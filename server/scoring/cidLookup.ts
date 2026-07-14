@@ -149,7 +149,7 @@ async function loadCIDCache(): Promise<CIDCache> {
         SELECT id, figure_name, aliases, figure_type, domains,
                cultural_context, scandal_summary, era
         FROM cid_figures
-        WHERE review_status = 'approved' AND status = 'active' AND (mined_only IS FALSE OR mined_only IS NULL) AND (ai_only IS FALSE OR ai_only IS NULL)
+        WHERE review_status = 'approved' AND status = 'active'
       `),
 
       // Layer 1: canonical records — approved + active only
