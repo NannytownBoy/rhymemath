@@ -450,7 +450,11 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
     // Density denominator: 0.15 means 2 hits in a 16-line verse = density 0.83
     // Tuned to approximate the "oh shit" recognition threshold —
     // even 1-2 authentic cultural hits in a verse is a meaningful signal
-    const culturalReferenceDensity = Math.min(1, totalRefMatches / Math.max(1, lineCount * 0.15));
+    // Density denominator raised to 0.5: requires ~8 distinct hits on a 16-line verse
+    // to reach max density. Old 0.15 allowed 2-3 hits to max out — too low.
+    // Also cap absolute totalRefMatches at 8 to prevent long-verse runaway.
+    const cappedRefMatches = Math.min(totalRefMatches, 8);
+    const culturalReferenceDensity = Math.min(1, cappedRefMatches / Math.max(1, lineCount * 0.5));
 
     if (totalRefMatches > 0) {
       const topRefs = matchedEntityLabels.slice(0, 5).join(", ");
@@ -481,10 +485,12 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
       }
     }
 
-    const entendreScore = entendreMatches === 0 ? 0
+    // Require avg strength >= 3 and cap at 3 matches to prevent stacking
+    const entendreAvgStrength = entendreMatches > 0 ? entendreStrengthSum / entendreMatches : 0;
+    const entendreScore = entendreMatches === 0 || entendreAvgStrength < 3 ? 0
       : Math.min(1,
-          (entendreStrengthSum / entendreMatches / 5) *
-          (Math.min(entendreMatches, 4) / 4)
+          (entendreAvgStrength / 5) *
+          (Math.min(entendreMatches, 3) / 3)
         );
 
     // ── LAYER 3b: Punchline Pattern Detection ─────────────────────────────────
@@ -506,10 +512,12 @@ export async function scoreCIDSignals(verse: string, lineCount: number): Promise
       }
     }
 
-    const punchlinePatternScore = punchlineMatches === 0 ? 0
+    // Require avg strength >= 3 and cap at 2 matches
+    const punchAvgStrength = punchlineMatches > 0 ? punchStrengthSum / punchlineMatches : 0;
+    const punchlinePatternScore = punchlineMatches === 0 || punchAvgStrength < 3 ? 0
       : Math.min(1,
-          (punchStrengthSum / punchlineMatches / 5) *
-          (Math.min(punchlineMatches, 3) / 3)
+          (punchAvgStrength / 5) *
+          (Math.min(punchlineMatches, 2) / 2)
         );
 
     // ── LAYER 4: Semantic Graph Co-occurrence ─────────────────────────────────

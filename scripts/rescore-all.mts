@@ -87,7 +87,7 @@ async function main() {
   `;
 
   if (!FORCE) {
-    query += ` AND (scoring_version IS NULL OR scoring_version != 'v6.0')`;
+    query += ` AND (scoring_version IS NULL OR scoring_version != 'v7.0')`;
   }
 
   query += ` ORDER BY created_at DESC`;
@@ -97,13 +97,13 @@ async function main() {
   console.log(`Found ${rows.length} rows to rescore.\n`);
 
   if (rows.length === 0) {
-    console.log("Nothing to rescore. All analyses are already at v6.0.");
+    console.log("Nothing to rescore. All analyses are already at v7.0.");
     await pool.end();
     return;
   }
 
   // ── Try to load the scorer ─────────────────────────────────────────────────
-  const SCORING_VERSION = "v6.0";
+  const SCORING_VERSION = "v7.0";
   const DEFAULT_WEIGHTS = {
     flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12
   };
@@ -186,7 +186,7 @@ async function main() {
             cid_signals       = $8,
             suppression_flags = $9,
             conceptual_score  = $10,
-            updated_at        = NOW()
+            updated_at        = EXTRACT(EPOCH FROM NOW())::int
           WHERE id = $11
         `, [
           pipeline.scores.overall,

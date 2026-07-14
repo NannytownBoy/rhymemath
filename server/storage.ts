@@ -296,9 +296,20 @@ export class DatabaseStorage implements IStorage {
       }
     };
 
-    return entries
-      .sort((a, b) => getSortScore(b) - getSortScore(a))
-      .slice(0, limit)
+    // Minimum sample gate: single-entry artists cannot top the leaderboard.
+    // n=1 is kept for display but ranked after artists with n>=3.
+    // This prevents a one-off high score from a low-volume artist dominating.
+    const MIN_RELIABLE = 3; // minimum analyses for a "reliable" ranking
+    const reliable = entries.filter(e => e.count >= MIN_RELIABLE);
+    const unreliable = entries.filter(e => e.count < MIN_RELIABLE);
+
+    // Sort each group separately, then concat reliable first
+    const sortGroup = (arr: typeof entries) =>
+      arr.sort((a, b) => getSortScore(b) - getSortScore(a));
+
+    const ranked = [...sortGroup(reliable), ...sortGroup(unreliable)].slice(0, limit);
+
+    return ranked
       .map((e, i) => ({
         rank: i + 1,
         artistName: e.artistName,
@@ -313,6 +324,7 @@ export class DatabaseStorage implements IStorage {
         battleCount: e.battleCount,
         winRate: e.battleCount > 0 ? Math.round((e.wins / e.battleCount) * 100) : 0,
         category,
+        lowSampleWarning: e.count < MIN_RELIABLE, // flag for UI to show asterisk
       }));
   }
 

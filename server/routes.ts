@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { scoreComparison, analyzeVerseSolo, isNonVerse, sectionDisplayLabel, SCORING_VERSION } from "./scoring/scoreComparison";
+import { scoreComparison, analyzeVerseSolo, isNonVerse, sectionDisplayLabel, SCORING_VERSION, resolvePerformer } from "./scoring/scoreComparison";
 import { scoreCIDSignals, clearCIDCache, getMatchedTokens } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
@@ -260,7 +260,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       try {
-        const cleanArtistName = toTitleCase(artistName);
+        // Resolve actual performer (handles feat. tags, compilation mis-attribution)
+        const resolvedArtist = resolvePerformer(artistName, songName);
+        const cleanArtistName = toTitleCase(resolvedArtist);
         const cleanSongName   = toTitleCase(songName);
         await storage.saveAnalysis({
           resultId: result.resultId,

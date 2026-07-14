@@ -34,9 +34,13 @@ export interface SuppressionResult {
 }
 
 // ── Suppression thresholds ────────────────────────────────────────────────────
-const ELITE_FLOOR   = 85;  // Scores at/above this are "elite" — need stronger evidence
-const HARD_CAP_WEAK = 72;  // Ceiling for verses with multiple weak-evidence flags
-const HARD_CAP_FILLER = 65; // Ceiling when repetition/filler dominates
+const ELITE_FLOOR      = 82;  // Reduced: elite needs to be harder to reach
+const HARD_CAP_WEAK    = 70;  // Lowered: weak evidence ceiling
+const HARD_CAP_FILLER  = 63;  // Lowered: filler ceiling
+const ABSOLUTE_MAX     = 95;  // No dimension can exceed this regardless of evidence
+// Authority band gate: to score above AUTHORITY_GATE, BOTH raw craft signals
+// AND diverse evidence must be present — prevents single-path runaway
+const AUTHORITY_GATE   = 88;  // Scores above this require explicit authority check
 
 // ── Repetition detector ───────────────────────────────────────────────────────
 // Flags verses where a significant portion of lines are near-identical
@@ -81,12 +85,15 @@ function fillerRatio(verse: string): number {
 // Fires when: raw score is elite AND evidence spread is thin (many 1-pt hits, no 10+ pt hits)
 function isShallowTagStack(rawScore: number, lineCount: number, verse: string): boolean {
   if (rawScore < ELITE_FLOOR) return false;
-  // Elite score on a very short verse = suspicious
+  // Elite score on a short verse = suspicious
   if (lineCount < 8 && rawScore >= ELITE_FLOOR) return true;
-  // Elite score with low word diversity = suspicious (same words repeated)
+  // Elite score on very long verse (>50 lines) without line-normalized check = suspicious
+  // Long blobs accumulate hits by volume, not craft density
+  if (lineCount > 50 && rawScore >= ELITE_FLOOR) return true;
+  // Low word diversity = repetitive filler
   const words = verse.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(w => w.length > 1);
   const uniqueRatio = new Set(words).size / Math.max(1, words.length);
-  if (uniqueRatio < 0.45 && rawScore >= ELITE_FLOOR) return true;
+  if (uniqueRatio < 0.50 && rawScore >= ELITE_FLOOR) return true; // raised from 0.45
   return false;
 }
 
@@ -125,10 +132,33 @@ function lengthCredibilityFlag(lineCount: number, scores: RawScores): string[] {
 export function applySuppressionLayer(
   rawScores: RawScores,
   verse: string,
-  lineCount: number
+  lineCount: number,
+  isOversized: boolean = false
 ): SuppressionResult {
   const scores = { ...rawScores };
   const flags: string[] = [];
+
+  // ── 0. Whole-song / oversized verse suppression ──────────────────────────
+  // A verse over 60 lines is almost certainly a full song. Density-based
+  // subscores (wordplay, punchlines) are unreliable at this scale because
+  // they accumulate hits by sheer volume rather than craft intensity.
+  // Cap wordplay and punchlines hard — flow and rhyming are less affected
+  // since they measure consistency across the available text.
+  if (isOversized) {
+    const OVERSIZED_CAP = 78;
+    if (scores.wordplay > OVERSIZED_CAP) {
+      scores.wordplay = OVERSIZED_CAP;
+      flags.push("oversized_verse:wordplay_capped");
+    }
+    if (scores.punchlines > OVERSIZED_CAP) {
+      scores.punchlines = OVERSIZED_CAP;
+      flags.push("oversized_verse:punchlines_capped");
+    }
+    if (scores.storytelling > 85) {
+      scores.storytelling = 85;
+      flags.push("oversized_verse:storytelling_capped");
+    }
+  }
 
   // ── 1. Repetition suppression ────────────────────────────────────────────
   const rep = detectRepetition(verse);
@@ -189,11 +219,33 @@ export function applySuppressionLayer(
     if (f.includes("flow")) scores.flow = Math.min(scores.flow, 70);
   }
 
-  // ── 6. Enforce per-dimension minimums (never suppress below 20) ──────────
-  // A verse can score low, but suppression must not artificially floor to 0
+  // ── 6. Authority gate — scores above 88 require diverse evidence ──────────
+  // If a dimension is above AUTHORITY_GATE but lineCount is < 12 (not a full verse),
+  // cap it. A 10-line verse cannot credibly demonstrate elite authority.
+  if (lineCount < 12) {
+    if (scores.wordplay > AUTHORITY_GATE) {
+      scores.wordplay = AUTHORITY_GATE;
+      flags.push("authority_gate:wordplay:short_verse");
+    }
+    if (scores.punchlines > AUTHORITY_GATE) {
+      scores.punchlines = AUTHORITY_GATE;
+      flags.push("authority_gate:punchlines:short_verse");
+    }
+    if (scores.storytelling > AUTHORITY_GATE) {
+      scores.storytelling = AUTHORITY_GATE;
+      flags.push("authority_gate:storytelling:short_verse");
+    }
+  }
+
+  // ── 7. Absolute max enforcement ─────────────────────────────────────────
+  for (const k of Object.keys(scores) as (keyof RawScores)[]) {
+    scores[k] = Math.min(scores[k], ABSOLUTE_MAX);
+  }
+
+  // ── 8. Enforce per-dimension minimums (never suppress below 20) ──────────
   for (const k of Object.keys(scores) as (keyof RawScores)[]) {
     scores[k] = clamp(Math.round(scores[k]));
-    scores[k] = Math.max(scores[k], 20); // absolute floor
+    scores[k] = Math.max(scores[k], 20);
   }
 
   return {

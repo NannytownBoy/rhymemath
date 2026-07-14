@@ -16,11 +16,49 @@ import { applySuppressionLayer, type RawScores } from "./suppressionEngine.js";
 import { scoreConceptualLyricism, applyConceptualBoosts } from "./conceptualLyricism.js";
 import { scoreCIDSignals, clearCIDCache } from "./cidLookup.js";
 export { clearCIDCache };
+// ── Performer / attribution resolution ───────────────────────────────────────
+// Resolves the actual verse performer from raw metadata.
+// Handles: "Artist feat. Guest", compilation albums, guest verses mis-attributed
+// to album owner. Priority: explicit feat tag > song_artist if different from
+// album artist > album artist as fallback.
+//
+// Examples:
+//   artist="Memphis Bleek feat. Jay-Z", song="Dear Summer" → "Jay-Z"
+//   artist="Jay-Z", song="Grammy Family Freestyle"          → "Jay-Z"
+//   artist="Various Artists feat. Nas", song="..."          → "Nas"
+export function resolvePerformer(rawArtist: string, songName?: string): string {
+  if (!rawArtist) return rawArtist;
+
+  // 1. Detect explicit feature credit in the artist field
+  //    e.g. "Memphis Bleek feat. Jay-Z" or "Jay-Z ft Kanye West"
+  const featMatch = rawArtist.match(/(?:feat\.?|ft\.?|featuring)\s+(.+?)(?:,|&|\band\b|$)/i);
+  if (featMatch) {
+    const featured = featMatch[1].trim();
+    // Use featured artist only if it looks like a real artist name (not generic)
+    const GENERIC = new Set(["various artists", "various", "unknown", "unknown artist"]);
+    if (!GENERIC.has(featured.toLowerCase()) && featured.length > 2) {
+      return featured;
+    }
+  }
+
+  // 2. Strip features from base artist name for clean display
+  const base = rawArtist.replace(/\s*(?:feat\.?|ft\.?|featuring)\s+.*/i, "").trim();
+
+  // 3. Compilation/Various Artists — cannot attribute to album owner
+  const VARIOUS = ["various artists", "various", "soundtrack", "compilation"];
+  if (VARIOUS.some(v => base.toLowerCase().includes(v))) {
+    return "Unknown"; // cannot resolve without more metadata
+  }
+
+  return base;
+}
+
+
 
 // ─── Scoring Version ─────────────────────────────────────────────────────────
 // Bump this whenever scoring logic changes. Every stored row records this version.
 // Identical version + identical text → identical scores (determinism guarantee).
-export const SCORING_VERSION = "v6.0";
+export const SCORING_VERSION = "v7.0";
 import { annotateVerse } from "./annotateVerse.js";
 import {
   getLines,
@@ -92,6 +130,16 @@ export function sectionDisplayLabel(label: string | null | undefined): string {
 function measureVerse(verse: string): MeasuredMetrics {
   const lines = getLines(verse);
   const lineCount = lines.length;
+
+  // ── Whole-song / oversized verse guard ──────────────────────────────────
+  // Verses over 60 lines are almost certainly full songs, not single verses.
+  // Scoring a 120-line blob the same way as a 16-line verse inflates every
+  // density metric by sheer volume. We flag this and hard-cap elite bands.
+  // Legitimate long verses (Mural, Rap God, freestyles) are still scored —
+  // but their density scores are normalized against a 60-line reference window
+  // rather than the full length, and elites require proportionally more hits.
+  const IS_OVERSIZED = lineCount > 60;
+  const EFFECTIVE_LINES = IS_OVERSIZED ? 60 : lineCount; // density denominator
   const syllCounts = lineSyllableCounts(lines);
   const wordCounts = lineWordCounts(lines);
   const avgLineLength = mean(wordCounts);
@@ -900,6 +948,7 @@ export function applyFullPipeline(
 } {
   const lines = getLines(verse);
   const lineCount = lines.length;
+  const IS_OVERSIZED = lineCount > 60;
 
   // ── Step 1: Raw subscores ─────────────────────────────────────────────────
   const { raw, flowEvidence, rhymeEvidence, wordplayEvidence, storyEvidence, punchEvidence } =
@@ -912,28 +961,43 @@ export function applyFullPipeline(
   // by the time they reach this point (enforced in cidLookup.ts SQL WHERE clause).
   let boosted = { ...raw };
 
+  // ── CID boosts — gated and capped to prevent surface-noun inflation ────────
+  // Rules:
+  //  1. Max additive boost per dimension is capped (no single CID signal can add >6pts)
+  //  2. CID cannot push a dimension above 88 on its own — raw craft must be there first
+  //  3. Storytelling CID boost requires raw storytelling >= 40 (authentic narrative base)
+  //  4. Wordplay CID boost requires raw wordplay >= 45 (entendres must land on real craft)
+  //  5. Punchlines CID boost requires raw punchlines >= 40 (pattern must reinforce real punch)
+  const CID_BOOST_CAP = 88; // CID cannot lift any dimension above this ceiling
+
   // Cultural reference density → Storytelling boost (approved figures/records)
-  const crdBoost = Math.round(cidSignals.culturalReferenceDensity * 8);
-  boosted.storytelling = clamp(boosted.storytelling + crdBoost);
+  const crdBoost = raw.storytelling >= 40
+    ? Math.min(6, Math.round(cidSignals.culturalReferenceDensity * 6))
+    : Math.min(3, Math.round(cidSignals.culturalReferenceDensity * 3));
+  boosted.storytelling = Math.min(CID_BOOST_CAP, clamp(boosted.storytelling + crdBoost));
 
   // Entendre signal → Wordplay boost (approved entendres only)
-  const entendreBoost = Math.round(cidSignals.entendreScore * 10);
-  boosted.wordplay = clamp(boosted.wordplay + entendreBoost);
+  const entendreBoost = raw.wordplay >= 45
+    ? Math.min(6, Math.round(cidSignals.entendreScore * 6))
+    : Math.min(3, Math.round(cidSignals.entendreScore * 3));
+  boosted.wordplay = Math.min(CID_BOOST_CAP, clamp(boosted.wordplay + entendreBoost));
 
   // Punchline pattern signal → Punchlines boost (approved punchline patterns only)
-  const punchlineBoost = Math.round(cidSignals.punchlinePatternScore * 8);
-  boosted.punchlines = clamp(boosted.punchlines + punchlineBoost);
+  const punchlineBoost = raw.punchlines >= 40
+    ? Math.min(6, Math.round(cidSignals.punchlinePatternScore * 6))
+    : Math.min(3, Math.round(cidSignals.punchlinePatternScore * 3));
+  boosted.punchlines = Math.min(CID_BOOST_CAP, clamp(boosted.punchlines + punchlineBoost));
 
-  // Semantic co-occurrence → small cross-pillar coherence boost
-  const semanticBoost = Math.round(cidSignals.semanticScore * 4);
-  boosted.storytelling = clamp(boosted.storytelling + Math.round(semanticBoost * 0.6));
-  boosted.wordplay     = clamp(boosted.wordplay     + Math.round(semanticBoost * 0.4));
+  // Semantic co-occurrence → small cross-pillar coherence boost (max 3pts total)
+  const semanticBoost = Math.min(3, Math.round(cidSignals.semanticScore * 3));
+  boosted.storytelling = Math.min(CID_BOOST_CAP, clamp(boosted.storytelling + Math.round(semanticBoost * 0.6)));
+  boosted.wordplay     = Math.min(CID_BOOST_CAP, clamp(boosted.wordplay     + Math.round(semanticBoost * 0.4)));
 
   // ── Step 3: Conceptual lyricism cross-cut ────────────────────────────────
   const conceptual = scoreConceptualLyricism(verse);
 
   // ── Step 4: Suppression ───────────────────────────────────────────────────
-  const suppression = applySuppressionLayer(boosted, verse, lineCount);
+  const suppression = applySuppressionLayer(boosted, verse, lineCount, IS_OVERSIZED);
 
   // ── Step 5: Post-suppression conceptual boost (cannot override suppression) ──
   const finalScores = applyConceptualBoosts(
@@ -989,7 +1053,8 @@ export async function scoreComparison(req: CompareRequest & { weights?: { flow: 
   }
 
   // Fetch CID signals for both verses in parallel (single DB round trip each)
-  const lines = (v: string) => v.split("\n").filter(l => l.trim().length > 0).length;
+  // Cap lineCount at 60 for CID density — prevents whole-song volume inflation
+  const lines = (v: string) => Math.min(60, v.split("\n").filter(l => l.trim().length > 0).length);
   const [cidA, cidB] = await Promise.all([
     scoreCIDSignals(req.verseA, lines(req.verseA)),
     scoreCIDSignals(req.verseB, lines(req.verseB)),
@@ -1071,7 +1136,8 @@ export async function analyzeVerseSolo(req: {
     activeWeights = DEFAULT_WEIGHTS;
   }
 
-  const lines_count = req.verse.split("\n").filter((l: string) => l.trim().length > 0).length;
+  // Cap lineCount at 60 for CID density — prevents whole-song volume inflation
+  const lines_count = Math.min(60, req.verse.split("\n").filter((l: string) => l.trim().length > 0).length);
   const cidSig = await scoreCIDSignals(req.verse, lines_count);
   const result = analyzeVerseSync(req.artistName, req.songName, req.verse, activeWeights, cidSig);
   const pipeline = (result as any)._pipeline;
