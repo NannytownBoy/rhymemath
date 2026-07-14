@@ -48,6 +48,12 @@ export const comparisons = pgTable("comparisons", {
   // Full result JSON
   resultJson: text("result_json").notNull(),
   createdAt: integer("created_at").notNull(),
+  // v6+: scoring metadata
+  scoringVersion: text("scoring_version"),
+  cidSignalsA: text("cid_signals_a"),
+  cidSignalsB: text("cid_signals_b"),
+  suppressionFlagsA: text("suppression_flags_a"),
+  suppressionFlagsB: text("suppression_flags_b"),
 });
 
 export const insertComparisonSchema = createInsertSchema(comparisons).omit({ id: true });
@@ -191,6 +197,12 @@ export const analyses = pgTable("analyses", {
   scorePunchlines: real("score_punchlines").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at"),
+  // v6+: scoring metadata
+  sectionWeightMultiplier: real("section_weight_multiplier"),
+  scoringVersion: text("scoring_version"),
+  cidSignals: text("cid_signals"),
+  suppressionFlags: text("suppression_flags"),
+  conceptualScore: real("conceptual_score"),
 });
 
 export const insertAnalysisSchema = createInsertSchema(analyses).omit({ id: true });
