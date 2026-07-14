@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { scoreComparison, analyzeVerseSolo, isNonVerse, sectionDisplayLabel } from "./scoring/scoreComparison";
+import { scoreComparison, analyzeVerseSolo, isNonVerse, sectionDisplayLabel, SCORING_VERSION } from "./scoring/scoreComparison";
 import { scoreCIDSignals, clearCIDCache, getMatchedTokens } from "./scoring/cidLookup";
 import { MOCK_ARTISTS } from "./mockData";
 import type { CompareRequest } from "@shared/schema";
@@ -9,7 +9,6 @@ import { runIntegrityCheck } from "./integrity";
 import { registerCommunityRoutes } from "./communityRoutes";
 
 // ── Scoring version — bump when formula changes significantly ─────────────────
-const SCORING_VERSION = "v5.0";
 
 // ── Title-case helper for artist names and song titles ────────────────────────
 function toTitleCase(s: string): string {
@@ -123,49 +122,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const effectiveVerseA = verseA.length >= 5 ? verseA : `[No verse provided for ${artistA} on ${songA}]`;
       const effectiveVerseB = verseB.length >= 5 ? verseB : `[No verse provided for ${artistB} on ${songB}]`;
 
-      // Run scoring engine (stateless — each call is isolated)
-      const finalResult = scoreComparison({
+      // scoreComparison is now async — fetches CID, applies suppression + conceptual in one pipeline
+      const finalResult = await scoreComparison({
         artistA, songA, verseA: effectiveVerseA,
         artistB, songB, verseB: effectiveVerseB,
         weights: isCustom ? rawWeights! : undefined,
       });
 
-      // ── CID boost for both sides of the battle ──────────────────────────
-      try {
-        const linesA = effectiveVerseA.split('\n').filter(l => l.trim()).length;
-        const linesB = effectiveVerseB.split('\n').filter(l => l.trim()).length;
-        const [cidA, cidB] = await Promise.all([
-          scoreCIDSignals(effectiveVerseA, linesA),
-          scoreCIDSignals(effectiveVerseB, linesB),
-        ]);
-        const applyBattleCID = (side: typeof finalResult.artistA, cid: typeof cidA) => {
-          const hasCID = cid.canonicalMatches > 0 || cid.aliasMatches > 0 ||
-                         cid.entendreMatches > 0 || cid.semanticCooccurrences > 0;
-          if (!hasCID) return;
-          const w = isCustom ? rawWeights! as any
-            : { flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12 };
-          side.scores.wordplay   = Math.min(100, side.scores.wordplay + Math.min(10,
-            cid.culturalReferenceDensity * 5 + cid.entendreScore * 4 + cid.semanticScore * 3));
-          side.scores.punchlines = Math.min(100, side.scores.punchlines + Math.min(6,
-            cid.punchlinePatternScore * 5 + cid.semanticScore * 2));
-          side.scores.overall = Math.min(100,
-            side.scores.flow * w.flow + side.scores.rhyming * w.rhyming +
-            side.scores.wordplay * w.wordplay + side.scores.storytelling * w.storytelling +
-            side.scores.punchlines * w.punchlines);
-        };
-        applyBattleCID(finalResult.artistA, cidA);
-        applyBattleCID(finalResult.artistB, cidB);
-        // Re-determine winner after CID adjustment
-        finalResult.artistA.scores.overall = Math.round(finalResult.artistA.scores.overall * 10) / 10;
-        finalResult.artistB.scores.overall = Math.round(finalResult.artistB.scores.overall * 10) / 10;
-      } catch (cidErr) {
-        console.error('CID battle scoring error (non-fatal):', cidErr);
-      }
-
       const resultWithMode = {
         ...finalResult,
-        scoringMode: isCustom ? "custom" : "standard",
+        scoringMode: isCustom ? `custom-${SCORING_VERSION}` : `standard-${SCORING_VERSION}`,
         customWeights: isCustom ? rawWeights : null,
+        scoringVersion: SCORING_VERSION,
       };
 
       // Persist result — DB failure is non-fatal, user still gets their result
@@ -227,7 +195,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const effectiveVerse = verse.length >= 5 ? verse : `[No verse provided for ${artistName} on ${songName}]`;
 
-      const result = analyzeVerseSolo({
+      const result = await analyzeVerseSolo({
         artistName, songName,
         verseLabel: verseLabel || undefined,
         sectionLabel: sectionLabel || undefined,

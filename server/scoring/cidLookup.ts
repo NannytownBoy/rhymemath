@@ -149,7 +149,7 @@ async function loadCIDCache(): Promise<CIDCache> {
         SELECT id, figure_name, aliases, figure_type, domains,
                cultural_context, scandal_summary, era
         FROM cid_figures
-        WHERE review_status = 'approved' AND status = 'active'
+        WHERE review_status = 'approved' AND status = 'active' AND (mined_only IS FALSE OR mined_only IS NULL) AND (ai_only IS FALSE OR ai_only IS NULL)
       `),
 
       // Layer 1: canonical records — approved + active only
@@ -178,7 +178,7 @@ async function loadCIDCache(): Promise<CIDCache> {
                COALESCE(a.sensitivity_tag, 'contextual') AS sensitivity_tag
         FROM cid_aliases a
         LEFT JOIN cid_cultural_records r ON r.record_id = a.canonical_record_id
-        WHERE a.review_status = 'approved'
+        WHERE a.review_status = 'approved' AND (a.mined_only IS FALSE OR a.mined_only IS NULL)
           AND a.status = 'active'
       `),
 

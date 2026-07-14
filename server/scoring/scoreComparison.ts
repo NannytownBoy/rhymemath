@@ -12,6 +12,15 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import { applySuppressionLayer, type RawScores } from "./suppressionEngine.js";
+import { scoreConceptualLyricism, applyConceptualBoosts } from "./conceptualLyricism.js";
+import { scoreCIDSignals, clearCIDCache } from "./cidLookup.js";
+export { clearCIDCache };
+
+// ─── Scoring Version ─────────────────────────────────────────────────────────
+// Bump this whenever scoring logic changes. Every stored row records this version.
+// Identical version + identical text → identical scores (determinism guarantee).
+export const SCORING_VERSION = "v6.0";
 import { annotateVerse } from "./annotateVerse.js";
 import {
   getLines,
@@ -671,7 +680,11 @@ function scorePunchlines(verse: string): { score: number; evidence: string[] } {
 
 // ─── Build Full Analysis ──────────────────────────────────────────────────────
 
-function analyzeVerse(artistName: string, songName: string, verse: string, weights: typeof DEFAULT_WEIGHTS): ArtistResult {
+function analyzeVerseSync(
+  artistName: string, songName: string, verse: string,
+  weights: typeof DEFAULT_WEIGHTS,
+  cidSignals: Awaited<ReturnType<typeof scoreCIDSignals>>
+): ArtistResult {
   const measured = measureVerse(verse);
   const lines = getLines(verse);
   const syllCounts = lineSyllableCounts(lines);
@@ -679,43 +692,33 @@ function analyzeVerse(artistName: string, songName: string, verse: string, weigh
   const storytelling = analyzeStorytelling(verse, lines);
   const punchlines = detectPunchlines(lines, syllCounts);
 
+  const pipeline = applyFullPipeline(verse, weights, cidSignals);
+
   const judged: JudgedMetrics = {
-    flowQuality: scoreFlow(verse, measured).score,
-    wordplay: scoreWordplay(verse).score,
-    storytelling: scoreStorytelling(verse).score,
-    punchlines: scorePunchlines(verse).score,
+    flowQuality: pipeline.scores.flow,
+    wordplay: pipeline.scores.wordplay,
+    storytelling: pipeline.scores.storytelling,
+    punchlines: pipeline.scores.punchlines,
     originality: clamp(wordplay.total * 4 + measured.internalRhymes * 3),
     setupPayoff: clamp(punchlines.setupPayoffPairs * 15 + 25),
     thematicProgression: clamp(storytelling.transitions * 7 + 30),
   };
 
-  const flowResult = scoreFlow(verse, measured);
-  const rhymeResult = scoreRhyming(verse, measured);
-  const wordplayResult = scoreWordplay(verse);
-  const storyResult = scoreStorytelling(verse);
-  const punchResult = scorePunchlines(verse);
-
   const scores: ScoreBreakdown = {
-    flow: flowResult.score,
-    wordplay: wordplayResult.score,
-    storytelling: storyResult.score,
-    rhyming: rhymeResult.score,
-    punchlines: punchResult.score,
-    overall:
-      flowResult.score * weights.flow +
-      wordplayResult.score * weights.wordplay +
-      storyResult.score * weights.storytelling +
-      rhymeResult.score * weights.rhyming +
-      punchResult.score * weights.punchlines,
+    flow: pipeline.scores.flow,
+    wordplay: pipeline.scores.wordplay,
+    storytelling: pipeline.scores.storytelling,
+    rhyming: pipeline.scores.rhyming,
+    punchlines: pipeline.scores.punchlines,
+    overall: pipeline.scores.overall,
   };
 
   return {
-    artistName,
-    songName,
-    verse,
+    artistName, songName, verse,
     scores,
     analysis: { measured, judged },
-  };
+    _pipeline: pipeline,
+  } as any;
 }
 
 // ─── Build Category Score Objects ─────────────────────────────────────────────
@@ -826,12 +829,149 @@ function buildExplanation(
   return { explanation, whyTheyWon };
 }
 
+// ─── CID-aware full verse analysis (used by solo + battle paths) ─────────────
+// Returns raw scores BEFORE suppression — caller applies suppression after.
+// CID signals are async and must be awaited at the route/entrypoint level.
+
+export function buildRawScores(verse: string, weights: typeof DEFAULT_WEIGHTS): {
+  raw: RawScores;
+  overall: number;
+  flowEvidence: string[];
+  rhymeEvidence: string[];
+  wordplayEvidence: string[];
+  storyEvidence: string[];
+  punchEvidence: string[];
+} {
+  const measured = measureVerse(verse);
+  const lines = getLines(verse);
+  const flowResult     = scoreFlow(verse, measured);
+  const rhymeResult    = scoreRhyming(verse, measured);
+  const wordplayResult = scoreWordplay(verse);
+  const storyResult    = scoreStorytelling(verse);
+  const punchResult    = scorePunchlines(verse);
+
+  const raw: RawScores = {
+    flow:         flowResult.score,
+    rhyming:      rhymeResult.score,
+    wordplay:     wordplayResult.score,
+    storytelling: storyResult.score,
+    punchlines:   punchResult.score,
+  };
+
+  const overall =
+    raw.flow         * weights.flow +
+    raw.rhyming      * weights.rhyming +
+    raw.wordplay     * weights.wordplay +
+    raw.storytelling * weights.storytelling +
+    raw.punchlines   * weights.punchlines;
+
+  return {
+    raw, overall,
+    flowEvidence:     flowResult.evidence,
+    rhymeEvidence:    rhymeResult.evidence,
+    wordplayEvidence: wordplayResult.evidence,
+    storyEvidence:    storyResult.evidence,
+    punchEvidence:    punchResult.evidence,
+  };
+}
+
+/**
+ * applyFullPipeline
+ * Single shared function that:
+ *   1. Computes raw subscores
+ *   2. Applies CID boosts (approved layers only)
+ *   3. Applies conceptual lyricism cross-cut
+ *   4. Applies suppression layer
+ *   5. Recomputes overall from final scores
+ *
+ * Used by solo, battle, ingest, and batch rescore — same path every time.
+ * CID signals are passed in (already awaited by the caller).
+ */
+export function applyFullPipeline(
+  verse: string,
+  weights: typeof DEFAULT_WEIGHTS,
+  cidSignals: Awaited<ReturnType<typeof scoreCIDSignals>>,
+): {
+  scores: RawScores & { overall: number };
+  suppressionFlags: string[];
+  conceptualScore: number;
+  cidSignals: Awaited<ReturnType<typeof scoreCIDSignals>>;
+  evidence: Record<string, string[]>;
+} {
+  const lines = getLines(verse);
+  const lineCount = lines.length;
+
+  // ── Step 1: Raw subscores ─────────────────────────────────────────────────
+  const { raw, flowEvidence, rhymeEvidence, wordplayEvidence, storyEvidence, punchEvidence } =
+    buildRawScores(verse, weights);
+
+  // ── Step 2: CID boosts (approved signals only) ────────────────────────────
+  // CID adds additive boosts proportional to signal strength.
+  // Never auto-promotes review-only, AI-only, or mined-only records.
+  // All four layers (figures, canonical, alias, entendre/punchline) are approved-only
+  // by the time they reach this point (enforced in cidLookup.ts SQL WHERE clause).
+  let boosted = { ...raw };
+
+  // Cultural reference density → Storytelling boost (approved figures/records)
+  const crdBoost = Math.round(cidSignals.culturalReferenceDensity * 8);
+  boosted.storytelling = clamp(boosted.storytelling + crdBoost);
+
+  // Entendre signal → Wordplay boost (approved entendres only)
+  const entendreBoost = Math.round(cidSignals.entendreScore * 10);
+  boosted.wordplay = clamp(boosted.wordplay + entendreBoost);
+
+  // Punchline pattern signal → Punchlines boost (approved punchline patterns only)
+  const punchlineBoost = Math.round(cidSignals.punchlinePatternScore * 8);
+  boosted.punchlines = clamp(boosted.punchlines + punchlineBoost);
+
+  // Semantic co-occurrence → small cross-pillar coherence boost
+  const semanticBoost = Math.round(cidSignals.semanticScore * 4);
+  boosted.storytelling = clamp(boosted.storytelling + Math.round(semanticBoost * 0.6));
+  boosted.wordplay     = clamp(boosted.wordplay     + Math.round(semanticBoost * 0.4));
+
+  // ── Step 3: Conceptual lyricism cross-cut ────────────────────────────────
+  const conceptual = scoreConceptualLyricism(verse);
+
+  // ── Step 4: Suppression ───────────────────────────────────────────────────
+  const suppression = applySuppressionLayer(boosted, verse, lineCount);
+
+  // ── Step 5: Post-suppression conceptual boost (cannot override suppression) ──
+  const finalScores = applyConceptualBoosts(
+    suppression.scores,
+    conceptual.conceptualScore,
+    suppression.flags,
+  );
+
+  // ── Step 6: Final overall ─────────────────────────────────────────────────
+  const overall = clamp(Math.round(
+    finalScores.flow         * weights.flow +
+    finalScores.rhyming      * weights.rhyming +
+    finalScores.wordplay     * weights.wordplay +
+    finalScores.storytelling * weights.storytelling +
+    finalScores.punchlines   * weights.punchlines
+  ));
+
+  return {
+    scores: { ...finalScores, overall },
+    suppressionFlags: suppression.flags,
+    conceptualScore: conceptual.conceptualScore,
+    cidSignals,
+    evidence: {
+      flow:         flowEvidence,
+      rhyming:      rhymeEvidence,
+      wordplay:     [...wordplayEvidence, ...cidSignals.evidence.filter(e => e.includes("entendre"))],
+      storytelling: [...storyEvidence, ...cidSignals.evidence.filter(e => !e.includes("entendre") && !e.includes("punchline"))],
+      punchlines:   [...punchEvidence, ...cidSignals.evidence.filter(e => e.includes("punchline"))],
+      conceptual:   conceptual.evidence,
+    },
+  };
+}
+
 // ─── Main Export: scoreComparison() ──────────────────────────────────────────
 
-export function scoreComparison(req: CompareRequest & { weights?: { flow: number; wordplay: number; storytelling: number; rhyming: number; punchlines: number } }): RhymeMathResult {
+export async function scoreComparison(req: CompareRequest & { weights?: { flow: number; wordplay: number; storytelling: number; rhyming: number; punchlines: number } }): Promise<RhymeMathResult> {
   const resultId = uuidv4();
 
-  // Resolve weights — each call gets its own immutable weights object (no module-level mutation)
   let activeWeights: typeof DEFAULT_WEIGHTS;
   if (req.weights) {
     const raw = req.weights;
@@ -848,8 +988,15 @@ export function scoreComparison(req: CompareRequest & { weights?: { flow: number
     activeWeights = DEFAULT_WEIGHTS;
   }
 
-  const resultA = analyzeVerse(req.artistA, req.songA, req.verseA, activeWeights);
-  const resultB = analyzeVerse(req.artistB, req.songB, req.verseB, activeWeights);
+  // Fetch CID signals for both verses in parallel (single DB round trip each)
+  const lines = (v: string) => v.split("\n").filter(l => l.trim().length > 0).length;
+  const [cidA, cidB] = await Promise.all([
+    scoreCIDSignals(req.verseA, lines(req.verseA)),
+    scoreCIDSignals(req.verseB, lines(req.verseB)),
+  ]);
+
+  const resultA = analyzeVerseSync(req.artistA, req.songA, req.verseA, activeWeights, cidA);
+  const resultB = analyzeVerseSync(req.artistB, req.songB, req.verseB, activeWeights, cidB);
 
   const categories = buildCategories(req.verseA, req.verseB, resultA, resultB, activeWeights);
 
@@ -898,7 +1045,7 @@ export function scoreComparison(req: CompareRequest & { weights?: { flow: number
 // ─── Solo Analysis: analyzeVerseSolo() ───────────────────────────────────────
 // Scores a single verse with full breakdown. No winner declared.
 
-export function analyzeVerseSolo(req: {
+export async function analyzeVerseSolo(req: {
   artistName: string;
   songName: string;
   verseLabel?: string;
@@ -924,7 +1071,10 @@ export function analyzeVerseSolo(req: {
     activeWeights = DEFAULT_WEIGHTS;
   }
 
-  const result = analyzeVerse(req.artistName, req.songName, req.verse, activeWeights);
+  const lines_count = req.verse.split("\n").filter((l: string) => l.trim().length > 0).length;
+  const cidSig = await scoreCIDSignals(req.verse, lines_count);
+  const result = analyzeVerseSync(req.artistName, req.songName, req.verse, activeWeights, cidSig);
+  const pipeline = (result as any)._pipeline;
   const annotation = annotateVerse(req.verse);
 
   // Build solo categories (no opponent — scores shown as absolutes)
@@ -1000,8 +1150,12 @@ export function analyzeVerseSolo(req: {
     analysis: result.analysis,
     categories,
     explanation,
-    scoringMode: req.weights ? "custom" : "standard",
+    scoringMode: req.weights ? `custom-${SCORING_VERSION}` : `standard-${SCORING_VERSION}`,
     customWeights: req.weights ?? null,
     annotation,
+    scoringVersion: SCORING_VERSION,
+    suppressionFlags: pipeline?.suppressionFlags ?? [],
+    conceptualScore: pipeline?.conceptualScore ?? 0,
+    cidSignalsSnapshot: cidSig,
   } as any;
 }

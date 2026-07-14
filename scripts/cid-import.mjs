@@ -70,20 +70,22 @@ for (const row of minedRefs) {
       INSERT INTO cid_cultural_records
         (record_id, term, canonical_meaning, category_primary, category_secondary,
          domains, era, region, confidence, review_status, status, source_id,
-         risk_flag, sensitivity_tag, display_label, notes, owner, last_reviewed_at, approved_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         risk_flag, sensitivity_tag, display_label, notes, owner, last_reviewed_at, approved_by,
+         mined_only, provenance, source_version)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,true,'miner','v6.0')
       ON CONFLICT (record_id) DO UPDATE SET
         term = EXCLUDED.term,
         canonical_meaning = EXCLUDED.canonical_meaning,
         category_primary = EXCLUDED.category_primary,
-        review_status = EXCLUDED.review_status,
+        -- NEVER downgrade a curated record back to needs_review
+        review_status = CASE WHEN cid_cultural_records.review_status = 'approved' THEN 'approved' ELSE EXCLUDED.review_status END,
         status = EXCLUDED.status,
         confidence = EXCLUDED.confidence
     `, [
       row.record_id, termValue, str(meaningValue),
       str(row.category_primary), str(row.category_secondary),
       str(row.domains), str(row.era), str(row.region),
-      int(row.confidence), str(row.review_status) || 'needs_review',
+      int(row.confidence), 'needs_review',  // v6: miner records always need human review
       str(row.status) || 'active', str(row.source_id),
       str(row.risk_flag) || 'low', str(row.sensitivity_tag),
       str(row.display_label), str(row.notes), str(row.owner),
@@ -153,7 +155,7 @@ for (const row of rels) {
 }
 console.log(`   ✅  ${log.relationships} relationships upserted\n`);
 
-// ── Step 7: entendre_candidates ──────────────────────────────────────────────
+// ── Step 7: entendre_candidates (AI-generated → cid_candidate_queue, not canonical table) ──────────────────────────────────────────────
 console.log('Step 7: entendre_candidates...');
 const entendres = readCSV('v5_4_entendres.csv');
 for (const row of entendres) {
