@@ -124,16 +124,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDynamicLeaderboard(category: string, limit: number = 20): Promise<any[]> {
-    const [allComparisons, allAnalyses] = await Promise.all([
-      db.select().from(comparisons),
-      db.select().from(analyses),
+    // Raw SQL instead of Drizzle select — avoids Drizzle driver version issues on Railway
+    // and only pulls the columns we actually need (faster, no memory bloat)
+    const NON_VERSE_SQL = "('hook','chorus','pre_hook','bridge','interlude','intro','outro','spoken','unknown')";
+    const [compRes, anaRes] = await Promise.all([
+      pool.query(`
+        SELECT result_id, artist_a_name, song_a_name, verse_label_a,
+               artist_b_name, song_b_name, verse_label_b,
+               winner, scoring_mode, winner_name, score_a, score_b, result_json
+        FROM comparisons
+      `),
+      pool.query(`
+        SELECT artist_name, score_overall, score_flow, score_wordplay,
+               score_storytelling, score_rhyming, score_punchlines,
+               scoring_mode, section_label
+        FROM analyses
+        WHERE score_overall IS NOT NULL
+          AND (section_label IS NULL OR LOWER(section_label) NOT IN ${NON_VERSE_SQL})
+      `),
     ]);
-    const standardComparisons = allComparisons.filter(c => !c.scoringMode || c.scoringMode === "standard" || c.scoringMode.startsWith("standard-"));
-    const NON_VERSE_LABELS = new Set(["hook","chorus","pre_hook","bridge","interlude","intro","outro","spoken","unknown"]);
+
+    const allComparisons = compRes.rows.map((r: any) => ({
+      resultId: r.result_id,
+      artistAName: r.artist_a_name,
+      songAName: r.song_a_name,
+      verseLabelA: r.verse_label_a,
+      artistBName: r.artist_b_name,
+      songBName: r.song_b_name,
+      verseLabelB: r.verse_label_b,
+      winner: r.winner,
+      scoringMode: r.scoring_mode,
+      winnerName: r.winner_name,
+      scoreA: r.score_a,
+      scoreB: r.score_b,
+      resultJson: r.result_json,
+    }));
+
+    const allAnalyses = anaRes.rows.map((r: any) => ({
+      artistName: r.artist_name,
+      scoreOverall: r.score_overall,
+      scoreFlow: r.score_flow,
+      scoreWordplay: r.score_wordplay,
+      scoreStorytelling: r.score_storytelling,
+      scoreRhyming: r.score_rhyming,
+      scorePunchlines: r.score_punchlines,
+      scoringMode: r.scoring_mode,
+      sectionLabel: r.section_label,
+    }));
+    const standardComparisons = allComparisons.filter((c: any) => !c.scoringMode || c.scoringMode === "standard" || c.scoringMode.startsWith("standard-"));
+    // Section label filtering already applied in SQL above
     const standardAnalyses = allAnalyses.filter(a =>
-      (!a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-")) &&
-      a.scoreOverall != null &&
-      !NON_VERSE_LABELS.has((a.sectionLabel ?? "").toLowerCase())
+      (!a.scoringMode || a.scoringMode === "standard" || a.scoringMode.startsWith("standard-"))
     );
 
     // Title-case helper for display names
@@ -332,32 +373,32 @@ export class DatabaseStorage implements IStorage {
   async getArtistVerses(artistName: string): Promise<any[]> {
     const normName = artistName.toLowerCase().trim();
     const [allComparisons, allAnalyses] = await Promise.all([
-      db.select().from(comparisons),
-      db.select().from(analyses),
+      pool.query('SELECT result_id,artist_a_name,song_a_name,verse_label_a,artist_b_name,song_b_name,verse_label_b,winner,scoring_mode,winner_name,score_a,score_b,result_json FROM comparisons').then((r: any) => r.rows),
+      pool.query('SELECT id,result_id,artist_name,song_name,verse_label,section_label,verse,scoring_mode,score_overall,score_flow,score_wordplay,score_storytelling,score_rhyming,score_punchlines,created_at FROM analyses WHERE score_overall IS NOT NULL').then((r: any) => r.rows),
     ]);
 
     const verses: any[] = [];
 
     // From comparisons
     for (const c of allComparisons) {
-      const isSideA = c.artistAName.toLowerCase().trim() === normName;
-      const isSideB = c.artistBName.toLowerCase().trim() === normName;
+      const isSideA = c.artist_a_name.toLowerCase().trim() === normName;
+      const isSideB = c.artist_b_name.toLowerCase().trim() === normName;
       if (!isSideA && !isSideB) continue;
 
       let scores: any = null;
       try {
-        const parsed = JSON.parse(c.resultJson);
+        const parsed = JSON.parse(c.result_json);
         scores = isSideA ? parsed.artistA?.scores : parsed.artistB?.scores;
       } catch { /* ignore */ }
 
-      const overall = isSideA ? c.scoreA : c.scoreB;
-      const oppName = isSideA ? c.artistBName : c.artistAName;
+      const overall = isSideA ? c.score_a : c.score_b;
+      const oppName = isSideA ? c.artist_b_name : c.artist_a_name;
       const myWinner = c.winner === "TIE" ? "TIE" : (isSideA && c.winner === "A") || (!isSideA && c.winner === "B") ? "W" : "L";
 
       verses.push({
         type: "battle",
-        resultId: c.resultId,
-        songName: isSideA ? c.songAName : c.songBName,
+        resultId: c.result_id,
+        songName: isSideA ? c.song_a_name : c.song_b_name,
         verseLabel: isSideA ? (c as any).verseLabelA || null : (c as any).verseLabelB || null,
         overall: Math.round(overall * 10) / 10,
         flow: Math.round((scores?.flow ?? 0) * 10) / 10,
@@ -367,27 +408,27 @@ export class DatabaseStorage implements IStorage {
         punchlines: Math.round((scores?.punchlines ?? 0) * 10) / 10,
         opponent: oppName,
         result: myWinner,
-        createdAt: c.createdAt,
+        createdAt: c.created_at,
       });
     }
 
     // From solo analyses
     for (const a of allAnalyses) {
-      if (a.artistName.toLowerCase().trim() !== normName) continue;
+      if (a.artist_name.toLowerCase().trim() !== normName) continue;
       verses.push({
         type: "solo",
-        resultId: a.resultId,
-        songName: a.songName,
-        verseLabel: a.verseLabel || null,
-        overall: Math.round(a.scoreOverall * 10) / 10,
-        flow: Math.round(a.scoreFlow * 10) / 10,
-        wordplay: Math.round(a.scoreWordplay * 10) / 10,
-        storytelling: Math.round(a.scoreStorytelling * 10) / 10,
-        rhyming: Math.round(a.scoreRhyming * 10) / 10,
-        punchlines: Math.round(a.scorePunchlines * 10) / 10,
+        resultId: a.result_id,
+        songName: a.song_name,
+        verseLabel: a.verse_label || null,
+        overall: Math.round(a.score_overall * 10) / 10,
+        flow: Math.round(a.score_flow * 10) / 10,
+        wordplay: Math.round(a.score_wordplay * 10) / 10,
+        storytelling: Math.round(a.score_storytelling * 10) / 10,
+        rhyming: Math.round(a.score_rhyming * 10) / 10,
+        punchlines: Math.round(a.score_punchlines * 10) / 10,
         opponent: null,
         result: null,
-        createdAt: a.createdAt,
+        createdAt: a.created_at,
       });
     }
 
@@ -414,7 +455,7 @@ export class DatabaseStorage implements IStorage {
   async getThreads(category?: string): Promise<Thread[]> {
     const all = await db.select().from(threads);
     const filtered = category && category !== "all" ? all.filter(t => t.category === category) : all;
-    return filtered.sort((a, b) => b.createdAt - a.createdAt);
+    return filtered.sort((a, b) => b.createdAt - a.created_at);
   }
 
   async getThread(id: number): Promise<Thread | undefined> {
@@ -437,7 +478,7 @@ export class DatabaseStorage implements IStorage {
 
   async getPostsByThread(threadId: number): Promise<Post[]> {
     const rows = await db.select().from(posts).where(eq(posts.threadId, threadId));
-    return rows.sort((a, b) => a.createdAt - b.createdAt);
+    return rows.sort((a, b) => a.created_at - b.createdAt);
   }
 }
 
