@@ -928,6 +928,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Debug: which DB URL is the server using? ──────────────────────────────
+  app.get("/api/ping", (_req, res) => {
+    const raw = (process.env.DB_URL || process.env.DATABASE_URL || "not set");
+    const safe = raw.replace(/:([^@:]+)@/, ":***@");
+    res.json({ ok: true, db: safe, using: process.env.DB_URL ? "DB_URL" : "DATABASE_URL" });
+  });
+
   // ── Admin: view current DB health (non-destructive) ───────────────────────
   app.get("/api/admin/db-health", async (_req, res) => {
     try {
