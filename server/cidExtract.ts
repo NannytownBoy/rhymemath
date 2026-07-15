@@ -14,7 +14,7 @@ import pg from "pg";
 const { Pool } = pg;
 
 function pool() {
-  return new Pool({ connectionString: process.env.DATABASE_URL });
+  return new Pool({ connectionString: (process.env.DB_URL || process.env.DATABASE_URL) });
 }
 
 // ── Keyword pattern sets ──────────────────────────────────────────────────────

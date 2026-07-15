@@ -14,7 +14,7 @@ import { POINTS } from "@shared/schema";
 import { clearCIDCache } from "./scoring/cidLookup";
 import { extractCIDFromAnnotation } from "./cidExtract";
 
-const DB = process.env.DATABASE_URL!;
+const DB = (process.env.DB_URL || process.env.DATABASE_URL)!;
 
 function pool() {
   return new Pool({ connectionString: DB, ssl: { rejectUnauthorized: false } });

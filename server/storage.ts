@@ -11,7 +11,7 @@ import { Pool } from "pg";
 import { eq, desc, ilike, and, or } from "drizzle-orm";
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: (process.env.DB_URL || process.env.DATABASE_URL),
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 

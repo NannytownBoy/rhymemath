@@ -9,9 +9,9 @@ import { createServer } from "node:http";
 import { Pool } from "pg";
 
 async function ensureTables() {
-  if (!process.env.DATABASE_URL) return;
+  if (!(process.env.DB_URL || process.env.DATABASE_URL)) return;
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: (process.env.DB_URL || process.env.DATABASE_URL),
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   });
   try {
