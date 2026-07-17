@@ -87,13 +87,17 @@ function isShallowTagStack(rawScore: number, lineCount: number, verse: string): 
   if (rawScore < ELITE_FLOOR) return false;
   // Elite score on a short verse = suspicious
   if (lineCount < 8 && rawScore >= ELITE_FLOOR) return true;
-  // Elite score on very long verse (>50 lines) without line-normalized check = suspicious
-  // Long blobs accumulate hits by volume, not craft density
-  if (lineCount > 50 && rawScore >= ELITE_FLOOR) return true;
-  // Low word diversity = repetitive filler
+  // v7.1: Removed blanket lineCount > 50 suppression.
+  // A technically dense 60-80 bar verse (Rigamortus, Mural, Funk Flex) should NOT be
+  // penalized for length. Instead, use WORD DIVERSITY to detect shallow accumulation:
+  // - Low unique word ratio (< 0.45) means repetitive vocabulary = filler stacking
+  // - High unique ratio = genuine craft density regardless of line count
   const words = verse.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(w => w.length > 1);
   const uniqueRatio = new Set(words).size / Math.max(1, words.length);
-  if (uniqueRatio < 0.50 && rawScore >= ELITE_FLOOR) return true; // raised from 0.45
+  if (uniqueRatio < 0.45 && rawScore >= ELITE_FLOOR) return true;  // repetitive filler
+  // For long verses (>50 lines), additionally require decent unique ratio (0.52+)
+  // This catches mid-tier artists who rack up hits via volume without craft
+  if (lineCount > 50 && uniqueRatio < 0.52 && rawScore >= ELITE_FLOOR) return true;
   return false;
 }
 
@@ -145,7 +149,10 @@ export function applySuppressionLayer(
   // Cap wordplay and punchlines hard — flow and rhyming are less affected
   // since they measure consistency across the available text.
   if (isOversized) {
-    const OVERSIZED_CAP = 78;
+    // v7.1: Oversized verses (full songs stored as single verses) get harder caps.
+    // Density-based scores (wp, punch, story) accumulate by volume not craft — cap them.
+    const OVERSIZED_CAP = 74;     // lowered from 78 — density signals unreliable in full songs
+    const OVERSIZED_STORY_CAP = 72; // storytelling cap for full songs
     if (scores.wordplay > OVERSIZED_CAP) {
       scores.wordplay = OVERSIZED_CAP;
       flags.push("oversized_verse:wordplay_capped");
@@ -154,8 +161,8 @@ export function applySuppressionLayer(
       scores.punchlines = OVERSIZED_CAP;
       flags.push("oversized_verse:punchlines_capped");
     }
-    if (scores.storytelling > 85) {
-      scores.storytelling = 85;
+    if (scores.storytelling > OVERSIZED_STORY_CAP) {
+      scores.storytelling = OVERSIZED_STORY_CAP;
       flags.push("oversized_verse:storytelling_capped");
     }
   }
@@ -192,11 +199,32 @@ export function applySuppressionLayer(
 
   // ── 3. Shallow tag stack suppression ────────────────────────────────────
   // Check each elite-scoring dimension for shallow evidence
-  const dimensions: (keyof RawScores)[] = ["wordplay", "storytelling", "punchlines", "rhyming", "flow"];
+  // v7.1: Exclude 'flow' from shallow tag check for long verses (50+ lines).
+  // Flow signals (phonetic echo, assonance, cadence) legitimately repeat in technical rap —
+  // applying shallow suppression to flow would unfairly penalize Rigamortus, Funk Flex, etc.
+  const dimensions: (keyof RawScores)[] = ["wordplay", "storytelling", "punchlines", "rhyming"];
   for (const dim of dimensions) {
     if (isShallowTagStack(scores[dim], lineCount, verse)) {
-      scores[dim] = Math.min(scores[dim], HARD_CAP_WEAK + 3);
+      scores[dim] = Math.min(scores[dim], HARD_CAP_WEAK + 2); // shallow cap: 72
       flags.push(`shallow_tag_stack:${dim}`);
+    }
+  }
+  // Flow suppression: apply if unique word ratio is very low (high repetition = not technical)
+  // v7.1 logic:
+  //   uniq < 0.40 = highly repetitive verse → flow suppressed regardless of line count
+  //   uniq 0.40-0.49 on 50+ line verse → moderate suppression (cap at 75, not 72)
+  //   uniq >= 0.50 → flow escapes suppression (genuine craft density)
+  {
+    const words2 = verse.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(w => w.length > 1);
+    const uRatio = new Set(words2).size / Math.max(1, words2.length);
+    if (scores.flow >= ELITE_FLOOR && uRatio < 0.40) {
+      scores.flow = Math.min(scores.flow, HARD_CAP_WEAK + 2); // cap at 72
+      flags.push("shallow_tag_stack:flow");
+    } else if (scores.flow >= ELITE_FLOOR && lineCount > 50 && uRatio < 0.44) {
+      // Only moderate-cap flow on long verses that are ALSO low-diversity (uRatio < 0.44)
+      // Rigamortus (uniq=0.47) escapes this; Polo G Pop Out (0.38) is caught by the < 0.40 block
+      scores.flow = Math.min(scores.flow, 75);
+      flags.push("shallow_tag_stack:flow:moderate");
     }
   }
 

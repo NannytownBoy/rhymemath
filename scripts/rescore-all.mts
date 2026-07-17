@@ -87,7 +87,7 @@ async function main() {
   `;
 
   if (!FORCE) {
-    query += ` AND (scoring_version IS NULL OR scoring_version != 'v7.0')`;
+    query += ` AND (scoring_version IS NULL OR scoring_version != 'v7.1')`;
   }
 
   query += ` ORDER BY created_at DESC`;
@@ -103,7 +103,7 @@ async function main() {
   }
 
   // ── Try to load the scorer ─────────────────────────────────────────────────
-  const SCORING_VERSION = "v7.0";
+  const SCORING_VERSION = "v7.1";
   const DEFAULT_WEIGHTS = {
     flow: 0.30, rhyming: 0.22, wordplay: 0.20, storytelling: 0.16, punchlines: 0.12
   };

@@ -58,7 +58,7 @@ export function resolvePerformer(rawArtist: string, songName?: string): string {
 // ─── Scoring Version ─────────────────────────────────────────────────────────
 // Bump this whenever scoring logic changes. Every stored row records this version.
 // Identical version + identical text → identical scores (determinism guarantee).
-export const SCORING_VERSION = "v7.0";
+export const SCORING_VERSION = "v7.1";
 import { annotateVerse } from "./annotateVerse.js";
 import {
   getLines,
