@@ -297,6 +297,42 @@ const APPROVED_ARTISTS = [
   { name: "Armani Caesar",       songs: 6,  priority: 2 },
   { name: "Rome Streetz",        songs: 6,  priority: 2 },
   { name: "Stove God Cooks",     songs: 6,  priority: 2 },
+
+  // ── 10k push additions ────────────────────────────────────────────────────
+  // Technical elite (calibration anchors — should score high)
+  { name: "Pharoahe Monch",       songs: 8,  priority: 1 },
+  { name: "Canibus",              songs: 8,  priority: 1 },
+  { name: "Organized Konfusion",  songs: 6,  priority: 2 },
+  { name: "KXNG Crooked",         songs: 8,  priority: 1 },
+  { name: "Vinnie Paz",           songs: 6,  priority: 2 },
+  { name: "Immortal Technique",   songs: 8,  priority: 2 },
+  { name: "Heem",                 songs: 6,  priority: 3 },
+  { name: "Elcamino",             songs: 6,  priority: 3 },
+  { name: "Ransom",               songs: 8,  priority: 2 },
+  { name: "Rapsody",              songs: 8,  priority: 2 },
+  { name: "Cordae",               songs: 8,  priority: 2 },
+  { name: "Lauryn Hill",          songs: 8,  priority: 1 },
+  { name: "Queen Latifah",        songs: 6,  priority: 2 },
+  { name: "MC Lyte",              songs: 6,  priority: 2 },
+  { name: "Noname",               songs: 6,  priority: 2 },
+  { name: "Saba",                 songs: 6,  priority: 2 },
+  { name: "Mick Jenkins",         songs: 6,  priority: 2 },
+  { name: "Tierra Whack",         songs: 6,  priority: 2 },
+  // Mid-tier contrast (should score 60-72 — needed for suppression calibration)
+  { name: "Lil Baby",             songs: 8,  priority: 2 },
+  { name: "NBA YoungBoy",         songs: 8,  priority: 2 },
+  { name: "Fivio Foreign",        songs: 6,  priority: 3 },
+  { name: "Sheff G",              songs: 6,  priority: 3 },
+  { name: "Plies",                songs: 6,  priority: 3 },
+  { name: "Yo Gotti",             songs: 6,  priority: 3 },
+  { name: "Boosie Badazz",        songs: 6,  priority: 3 },
+  { name: "EST Gee",              songs: 6,  priority: 3 },
+  { name: "Jack Harlow",          songs: 6,  priority: 3 },
+  { name: "Nicki Minaj",          songs: 8,  priority: 2 },
+  { name: "Cardi B",              songs: 6,  priority: 3 },
+  { name: "Smino",                songs: 6,  priority: 3 },
+  { name: "Aminé",                songs: 6,  priority: 3 },
+  { name: "Injury Reserve",       songs: 6,  priority: 3 },
 ];
 
 // ── Genius API ────────────────────────────────────────────────────────────────
